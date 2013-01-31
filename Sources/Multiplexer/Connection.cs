@@ -1,6 +1,7 @@
 ﻿namespace Multiplexer
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Net.Sockets;
     using System.Threading;
@@ -9,7 +10,7 @@
     {
         private Socket socket;
         private int streamId;
-        private Dictionary<int, Channel> streams;
+        private ConcurrentDictionary<int, Channel> streams;
 
         private FrameWriter frameWriter;
         private FrameFragmentReader frameFragmentReader;
@@ -17,7 +18,7 @@
         public Connection(Socket socket)
         {
             this.socket = socket;
-            this.streams = new Dictionary<int, Channel>();
+            this.streams = new ConcurrentDictionary<int, Channel>();
             this.frameWriter = new FrameWriter(new TcpWriter(socket));
             this.frameFragmentReader = new FrameFragmentReader(new TcpReader(socket));
         }
@@ -27,9 +28,8 @@
             int nextStreamId = Interlocked.Increment(ref this.streamId);
             Sender sender = new Sender(this.frameWriter, nextStreamId);
             Channel newStream = new Channel(sender, this.frameFragmentReader.CreateReceiver(nextStreamId));
-            Console.WriteLine(this == null);
-            Console.WriteLine(this.streams == null);
-            this.streams.Add(nextStreamId, newStream);
+            this.streams.TryAdd(nextStreamId, newStream);
+            // TODO: Can it fail?
             return newStream;
         }
 

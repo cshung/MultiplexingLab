@@ -7,7 +7,7 @@
     {
         private Socket socket;
 
-        public TcpReader(Socket socket)
+        internal TcpReader(Socket socket)
         {
             this.socket = socket;
         }

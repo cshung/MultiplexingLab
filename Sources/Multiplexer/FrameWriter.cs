@@ -18,7 +18,7 @@
         private List<WriteAsyncResult> writingResults;
         private bool completedOneSegment;
 
-        public FrameWriter(ITransportWriter transportWriter)
+        internal FrameWriter(ITransportWriter transportWriter)
         {
             this.transportWriter = transportWriter;
             this.pendingRequests = new ConcurrentQueue<List<WriteFrame>>();
@@ -92,7 +92,7 @@
                         this.completedOneSegment = false;
                         WriteAsyncResult completedResult = this.writingResults[0];
                         this.writingResults.RemoveAt(0);
-                        completedResult.CompleteFrame();
+                        completedResult.OnFrameCompleted();
                     }
                     else
                     {

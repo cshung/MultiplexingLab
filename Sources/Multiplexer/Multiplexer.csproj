@@ -51,6 +51,7 @@
     <Compile Include="ITransportReader.cs" />
     <Compile Include="ITransportWriter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ReadAsyncResult.cs" />
     <Compile Include="Receiver.cs" />
     <Compile Include="Sender.cs" />
     <Compile Include="TcpReader.cs" />

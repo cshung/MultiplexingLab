@@ -8,7 +8,7 @@
     {
         private Socket socket;
 
-        public TcpWriter(Socket socket)
+        internal TcpWriter(Socket socket)
         {
             this.socket = socket;
         }

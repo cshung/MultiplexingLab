@@ -26,7 +26,7 @@
         private ConcurrentQueue<AcceptAsyncResult> pendingAcceptRequests;
         private ConcurrentDictionary<int, Receiver> receivers;
 
-        public FrameFragmentReader(ITransportReader transportReader)
+        internal FrameFragmentReader(ITransportReader transportReader)
         {
             this.transportReader = transportReader;
             this.buffer = new byte[Constants.DecodingBufferSize];
@@ -36,13 +36,27 @@
             this.BeginFillBuffer();
         }
 
-        public IAsyncResult BeginAccept(AsyncCallback callback, object state)
+        public void ArraySegmentCompleted()
+        {
+            // If the reading of network is stopped because buffer is full, and all segnent created are comsumed, then read again
+            if (Interlocked.Decrement(ref this.segmentCount) == 0)
+            {
+                if (bufferFull)
+                {
+                    this.bufferFull = false;
+                    this.bufferStart = 0;
+                    this.BeginFillBuffer();
+                }
+            }
+        }
+
+        internal IAsyncResult BeginAccept(AsyncCallback callback, object state)
         {
             AcceptAsyncResult result = new AcceptAsyncResult(this, callback, state);
             Receiver newReceiver;
             if (newReceivers.TryDequeue(out newReceiver))
             {
-                result.ExternalComplete(newReceiver, true);
+                result.OnReceiverAvailable(newReceiver, true);
             }
             else
             {
@@ -51,9 +65,17 @@
             return result;
         }
 
-        public Receiver EndAccept(IAsyncResult ar)
+        internal Receiver EndAccept(IAsyncResult ar)
         {
             return AsyncResult<Receiver>.End(ar, this, "Accept");
+        }
+
+        internal Receiver CreateReceiver(int nextStreamId)
+        {
+            Receiver newReceiver = new Receiver(this, nextStreamId);
+            // TODO: Possible to fail at all?
+            this.receivers.TryAdd(nextStreamId, newReceiver);
+            return newReceiver;
         }
 
         private void BeginFillBuffer()
@@ -169,7 +191,7 @@
                 dequeueResult = newReceivers.TryDequeue(out newReceiver);
                 Debug.Assert(dequeueResult, "There is only ONE thread doing dequeue, we already checked the queue has element in it");
 
-                pendingAcceptRequest.ExternalComplete(newReceiver, false);
+                pendingAcceptRequest.OnReceiverAvailable(newReceiver, false);
             }
 
             if (decodingPointer != buffer.Length)
@@ -244,28 +266,6 @@
             FrameFragmentReader thisPtr = (FrameFragmentReader)ar.AsyncState;
             int byteRead = thisPtr.transportReader.EndRead(ar);
             thisPtr.OnTransportRead(byteRead);
-        }
-
-        public void ArraySegmentCompleted()
-        {
-            // If the reading of network is stopped because buffer is full, and all segnent created are comsumed, then read again
-            if (Interlocked.Decrement(ref this.segmentCount) == 0)
-            {
-                if (bufferFull)
-                {
-                    this.bufferFull = false;
-                    this.bufferStart = 0;
-                    this.BeginFillBuffer();
-                }
-            }
-        }
-
-        internal Receiver CreateReceiver(int nextStreamId)
-        {
-            Receiver newReceiver = new Receiver(this, nextStreamId);
-            // TODO: Possible to fail at all?
-            this.receivers.TryAdd(nextStreamId, newReceiver);
-            return newReceiver;
         }
     }
 }

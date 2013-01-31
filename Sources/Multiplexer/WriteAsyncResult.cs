@@ -7,7 +7,7 @@
     {
         private int incompleteFrameCounts;
 
-        public WriteAsyncResult(Sender sender, IFrameWriter frameWriter, int streamId, ArraySegment<byte> buffer, AsyncCallback callback, object state)
+        internal WriteAsyncResult(Sender sender, IFrameWriter frameWriter, int streamId, ArraySegment<byte> buffer, AsyncCallback callback, object state)
             : base(callback, state, sender, "Write")
         {
             // Break the buffer into frames.
@@ -50,7 +50,7 @@
             }
         }
 
-        public void CompleteFrame()
+        internal void OnFrameCompleted()
         {
             if (--this.incompleteFrameCounts == 0)
             {

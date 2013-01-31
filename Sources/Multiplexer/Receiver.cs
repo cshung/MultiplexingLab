@@ -12,20 +12,27 @@
 
         private ReadAsyncResult readRequest;
 
-        public Receiver(IFrameFragmentReader reader, int streamId)
+        internal Receiver(IFrameFragmentReader reader, int streamId)
         {
             this.frameFragmentReader = reader;
             this.StreamId = streamId;
             this.dataQueue = new ConcurrentQueue<ArraySegment<byte>>();
         }
 
-        public IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
+        internal int StreamId { get; private set; }
+
+        internal IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
         {
             Debug.Assert(this.readRequest == null, "Expected single thread use");
             ReadAsyncResult currentResult = new ReadAsyncResult(this, buffer, offset, count, callback, state);
             this.readRequest = currentResult;
             this.readRequest.TryComplete(true);
             return currentResult;
+        }
+
+        internal int EndRead(IAsyncResult ar)
+        {
+            return AsyncResult<int>.End(ar, this, "Read");
         }
 
         internal int NonBlockingFillBuffer(byte[] buffer, int offset, int count)
@@ -98,11 +105,6 @@
             return byteCopied;
         }
 
-        public int EndRead(IAsyncResult ar)
-        {
-            return AsyncResult<int>.End(ar, this, "Read");
-        }
-
         internal void Enqueue(ArraySegment<byte> payload)
         {
             this.dataQueue.Enqueue(payload);
@@ -110,35 +112,6 @@
             {
                 this.readRequest.TryComplete(false);
             }
-        }
-
-        public int StreamId { get; private set; }
-    }
-
-    class ReadAsyncResult : AsyncResult<int>
-    {
-        private Receiver receiver;
-        private byte[] buffer;
-        private int offset;
-        private int count;
-
-        public ReadAsyncResult(Receiver receiver, byte[] buffer, int offset, int count, AsyncCallback callback, object state)
-            : base(callback, state, receiver, "Read")
-        {
-            this.receiver = receiver;
-            this.buffer = buffer;
-            this.offset = offset;
-            this.count = count;            
-        }
-
-        public void TryComplete(bool isSynchronousTry)
-        {
-            int bytesRead = this.receiver.NonBlockingFillBuffer(buffer, offset, count);
-            if (bytesRead > 0)
-            {
-                this.SetResult(bytesRead);
-                this.Complete(null, isSynchronousTry);
-            }
-        }
+        }        
     }
 }

@@ -36,9 +36,9 @@
 
         private void OnAccept(TcpClient client)
         {
-            Console.WriteLine("Accepted client request");
+            Console.WriteLine("[Server] Accepting TCP connection");
             this.listener.BeginAcceptTcpClient(OnAccept, this);
-            new ConnectionHandler(client).Run();
+            new ConnectionHandler(client);
         }
     }
 
@@ -47,14 +47,11 @@
     {
         private NetworkStream stream;
         private byte[] buffer = new byte[10];
+        private int lineNumber;
 
         public DebuggingConnectionHandler(TcpClient client)
         {
             this.stream = client.GetStream();
-        }
-
-        public void Run()
-        {
             Next();
         }
 
@@ -77,8 +74,6 @@
             }
 
         }
-
-        private int lineNumber;
 
         private void OnRead(int byteRead)
         {
@@ -107,15 +102,11 @@
 
         private static void OnAcceptedCallback(IAsyncResult ar)
         {
-            Console.WriteLine("Server accepting");
+            Console.WriteLine("[Server] Accepting Channel");
             ConnectionHandler thisPtr = (ConnectionHandler)ar.AsyncState;
             Channel stream = thisPtr.connection.EndAccept(ar);
             thisPtr.connection.BeginAccept(OnAcceptedCallback, thisPtr);
             new StreamHandler(stream);
-        }
-
-        internal void Run()
-        {
         }
     }
 

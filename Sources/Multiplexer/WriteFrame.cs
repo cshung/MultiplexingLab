@@ -1,13 +1,8 @@
 ﻿namespace Multiplexer
 {
     using System;
-    using System.Collections.Concurrent;
-    using System.Collections.Generic;
-    using System.Diagnostics;
-    using System.Net.Sockets;
-    using System.Threading;
 
-    public class WriteFrame
+    internal class WriteFrame
     {
         public WriteFrame(ArraySegment<byte> header, ArraySegment<byte> payload, WriteAsyncResult writeAsyncResult)
         {

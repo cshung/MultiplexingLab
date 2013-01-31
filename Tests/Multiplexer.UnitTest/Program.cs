@@ -23,8 +23,8 @@
         private static void TestSmallFrame()
         {
             FakeFrameWriter fakeFrameWriter = new FakeFrameWriter();
-            Sender sender = new Sender(fakeFrameWriter);
-            sender.BeginWrite(new byte[] { 1, 2, 3, 4 }, 1, 2, 0, null, null);
+            Sender sender = new Sender(fakeFrameWriter, 0);
+            sender.BeginWrite(new byte[] { 1, 2, 3, 4 }, 1, 2, null, null);
             fakeFrameWriter.VerifySingleFrame(1, 2);
             Console.WriteLine("TestSmallFrame passed.");
         }
@@ -32,14 +32,16 @@
         private static void TestJustFitFrame()
         {
             FakeFrameWriter fakeFrameWriter = new FakeFrameWriter();
-            Sender sender = new Sender(fakeFrameWriter);
-            sender.BeginWrite(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 0, 10, 0, null, null);
+            Sender sender = new Sender(fakeFrameWriter, 0);
+            sender.BeginWrite(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 0, 10, null, null);
             fakeFrameWriter.VerifySingleFrame(0, 10);
             Console.WriteLine("TestJustFitFrame passed.");
         }
+
+        // TODO: Unit Testing other components as well
     }
 
-    public class FakeFrameWriter : IFrameWriter
+    internal class FakeFrameWriter : IFrameWriter
     {
         List<List<WriteFrame>> writtenFrames = new List<List<WriteFrame>>();
 

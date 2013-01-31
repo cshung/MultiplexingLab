@@ -4,10 +4,9 @@
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Diagnostics;
-    using System.Net.Sockets;
     using System.Threading;
 
-    public class FrameFragmentReader : IFrameFragmentReader
+    internal class FrameFragmentReader : IFrameFragmentReader
     {
         private ITransportReader transportReader;
         private byte[] buffer;

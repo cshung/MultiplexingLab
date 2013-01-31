@@ -1,13 +1,10 @@
 ﻿namespace Multiplexer
 {
     using System;
-    using System.Collections.Concurrent;
-    using System.Collections.Generic;
     using System.Diagnostics;
-    using System.Net.Sockets;
     using System.Threading;
 
-    public class AsyncResult : IAsyncResult
+    internal class AsyncResult : IAsyncResult
     {
         // Fields set at construction which never change while operation is pending
         private readonly AsyncCallback m_AsyncCallback;
@@ -206,7 +203,7 @@
         #endregion
     }
 
-    public class AsyncResult<TResult> : AsyncResult
+    internal class AsyncResult<TResult> : AsyncResult
     {
         // Field set when operation completes
         private TResult m_result = default(TResult);

@@ -36,7 +36,7 @@
         {
             Console.WriteLine("Accepted client request");
             this.listener.BeginAcceptTcpClient(OnAccept, this);
-            new DebuggingConnectionHandler(client).Run();
+            new ConnectionHandler(client).Run();
         }
     }
 
@@ -95,22 +95,21 @@
 
     public class ConnectionHandler
     {
-        private FrameFragmentReader frameFragmentReader;
+        private Connection connection;
 
         public ConnectionHandler(TcpClient client)
         {
-            TcpReader tcpReader = new TcpReader(client.Client);
-            this.frameFragmentReader = new FrameFragmentReader(tcpReader);
-            this.frameFragmentReader.BeginAccept(OnAcceptedCallback, this);
+            this.connection = new Connection(client.Client);
+            this.connection.BeginAccept(OnAcceptedCallback, this);
         }
 
         private static void OnAcceptedCallback(IAsyncResult ar)
         {
             Console.WriteLine("Server accepting");
             ConnectionHandler thisPtr = (ConnectionHandler)ar.AsyncState;
-            Receiver receiver = thisPtr.frameFragmentReader.EndAccept(ar);
-            new StreamHandler(receiver);
-            thisPtr.frameFragmentReader.BeginAccept(OnAcceptedCallback, thisPtr);
+            Stream stream = thisPtr.connection.EndAccept(ar);
+            new StreamHandler(stream);
+            thisPtr.connection.BeginAccept(OnAcceptedCallback, thisPtr);
         }
 
         internal void Run()
@@ -121,22 +120,22 @@
     public class StreamHandler
     {
         private byte[] buffer = new byte[10];
-        private Receiver receiver;
+        private Stream stream;
         private Guid identity;
 
-        public StreamHandler(Receiver receiver)
+        public StreamHandler(Stream stream)
         {
             this.identity = Guid.NewGuid();
-            this.receiver = receiver;
+            this.stream = stream;
             Read();
         }
 
         private void Read()
         {
-            IAsyncResult ar = this.receiver.BeginRead(buffer, 0, 10, OnReceivedCallback, this);
+            IAsyncResult ar = this.stream.BeginRead(buffer, 0, 10, OnReceivedCallback, this);
             if (ar.CompletedSynchronously)
             {
-                this.OnReceived(this.receiver.EndRead(ar));
+                this.OnReceived(this.stream.EndRead(ar));
             }
         }
 
@@ -147,7 +146,7 @@
                 return;
             }
             StreamHandler thisPtr = (StreamHandler)ar.AsyncState;
-            int byteRead = thisPtr.receiver.EndRead(ar);
+            int byteRead = thisPtr.stream.EndRead(ar);
             thisPtr.OnReceived(byteRead);
         }
 

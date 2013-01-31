@@ -1,36 +1,31 @@
 ﻿namespace Multiplexer
 {
     using System;
-    using System.Collections.Concurrent;
-    using System.Collections.Generic;
-    using System.Diagnostics;
-    using System.Net.Sockets;
-    using System.Threading;
-    
+
     public class Stream
     {
-        private int streamId;
         private Sender sender;
+        private Receiver receiver;
 
-        internal Stream(int streamId, Sender sender)
+        internal Stream(Sender sender, Receiver receiver)
         {
-            this.streamId = streamId;
             this.sender = sender;
+            this.receiver = receiver;
         }
 
-        public void BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
+        public IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
         {
-            throw new NotImplementedException();
+            return this.receiver.BeginRead(buffer, offset, count, callback, state);
         }
 
         public int EndRead(IAsyncResult ar)
         {
-            throw new NotImplementedException();
+            return this.receiver.EndRead(ar);
         }
 
         public void BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
         {
-            this.sender.BeginWrite(buffer, offset, count, streamId, callback, state);
+            this.sender.BeginWrite(buffer, offset, count, callback, state);
         }
 
         public void EndWrite(IAsyncResult ar)

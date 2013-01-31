@@ -1,13 +1,10 @@
 ﻿namespace Multiplexer
 {
     using System;
-    using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using System.Diagnostics;
     using System.Net.Sockets;
-    using System.Threading;
 
-    class TcpWriter : ITransportWriter
+    internal class TcpWriter : ITransportWriter
     {
         private Socket socket;
 

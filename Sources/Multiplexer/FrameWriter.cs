@@ -3,11 +3,9 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using System.Diagnostics;
-    using System.Net.Sockets;
     using System.Threading;
 
-    public class FrameWriter : IFrameWriter
+    internal class FrameWriter : IFrameWriter
     {
         private readonly ITransportWriter transportWriter;
 

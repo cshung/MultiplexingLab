@@ -4,10 +4,9 @@
     using System.Collections.Concurrent;
     using System.Diagnostics;
 
-    public class Receiver
+    internal class Receiver
     {
         private IFrameFragmentReader frameFragmentReader;
-        private int streamId;
         private ConcurrentQueue<ArraySegment<byte>> dataQueue;
         private ArraySegment<byte>? lastBlock;
 
@@ -16,7 +15,7 @@
         public Receiver(IFrameFragmentReader reader, int streamId)
         {
             this.frameFragmentReader = reader;
-            this.streamId = streamId;
+            this.StreamId = streamId;
             this.dataQueue = new ConcurrentQueue<ArraySegment<byte>>();
         }
 
@@ -112,6 +111,8 @@
                 this.readRequest.TryComplete(false);
             }
         }
+
+        public int StreamId { get; private set; }
     }
 
     class ReadAsyncResult : AsyncResult<int>

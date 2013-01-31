@@ -3,8 +3,10 @@
     using Common;
     using Multiplexer;
     using System;
+    using System.IO;
     using System.Net;
     using System.Net.Sockets;
+    using System.Threading;
 
     internal class Program
     {
@@ -107,9 +109,9 @@
         {
             Console.WriteLine("Server accepting");
             ConnectionHandler thisPtr = (ConnectionHandler)ar.AsyncState;
-            Stream stream = thisPtr.connection.EndAccept(ar);
-            new StreamHandler(stream);
+            Channel stream = thisPtr.connection.EndAccept(ar);
             thisPtr.connection.BeginAccept(OnAcceptedCallback, thisPtr);
+            new StreamHandler(stream);
         }
 
         internal void Run()
@@ -119,44 +121,32 @@
 
     public class StreamHandler
     {
-        private byte[] buffer = new byte[10];
-        private Stream stream;
+        private Channel channel;
         private Guid identity;
 
-        public StreamHandler(Stream stream)
+        public StreamHandler(Channel channel)
         {
             this.identity = Guid.NewGuid();
-            this.stream = stream;
-            Read();
+            this.channel = channel;
+            // Stream processing code must not block on stream operation - that will lead to deadlock
+            ThreadPool.QueueUserWorkItem(HandleChannel, this);
         }
 
-        private void Read()
+        private static void HandleChannel(object state)
         {
-            IAsyncResult ar = this.stream.BeginRead(buffer, 0, 10, OnReceivedCallback, this);
-            if (ar.CompletedSynchronously)
-            {
-                this.OnReceived(this.stream.EndRead(ar));
-            }
+            StreamHandler thisPtr = (StreamHandler)state;
+            thisPtr.HandleChannel();            
         }
 
-        private static void OnReceivedCallback(IAsyncResult ar)
+        private void HandleChannel()
         {
-            if (ar.CompletedSynchronously)
+            using (StreamReader reader = new StreamReader(this.channel))
             {
-                return;
+                using (StreamWriter writer = new StreamWriter(this.channel))
+                {
+                    writer.WriteLine(reader.ReadLine());
+                }
             }
-            StreamHandler thisPtr = (StreamHandler)ar.AsyncState;
-            int byteRead = thisPtr.stream.EndRead(ar);
-            thisPtr.OnReceived(byteRead);
-        }
-
-        private void OnReceived(int byteRead)
-        {
-            for (int i = 0; i < byteRead; i++)
-            {
-                Console.WriteLine("{0} received {1}", this.identity, this.buffer[i]);
-            }
-            Read();
         }
     }
 }

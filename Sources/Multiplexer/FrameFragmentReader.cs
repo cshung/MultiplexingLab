@@ -24,13 +24,13 @@
 
         private ConcurrentQueue<Receiver> newReceivers;
         private ConcurrentQueue<AcceptAsyncResult> pendingAcceptRequests;
-        private Dictionary<int, Receiver> receivers;
+        private ConcurrentDictionary<int, Receiver> receivers;
 
         public FrameFragmentReader(ITransportReader transportReader)
         {
             this.transportReader = transportReader;
             this.buffer = new byte[Constants.DecodingBufferSize];
-            this.receivers = new Dictionary<int, Receiver>();
+            this.receivers = new ConcurrentDictionary<int, Receiver>();
             this.newReceivers = new ConcurrentQueue<Receiver>();
             this.pendingAcceptRequests = new ConcurrentQueue<AcceptAsyncResult>();
             this.BeginFillBuffer();
@@ -225,7 +225,8 @@
             if (!this.receivers.TryGetValue(streamId, out receiver))
             {
                 receiver = new Receiver(this, streamId);
-                this.receivers.Add(streamId, receiver);
+                // TODO, possible to fail at all?
+                this.receivers.TryAdd(streamId, receiver);
                 this.newReceivers.Enqueue(receiver);
             }
 
@@ -257,6 +258,14 @@
                     this.BeginFillBuffer();
                 }
             }
+        }
+
+        internal Receiver CreateReceiver(int nextStreamId)
+        {
+            Receiver newReceiver = new Receiver(this, nextStreamId);
+            // TODO: Possible to fail at all?
+            this.receivers.TryAdd(nextStreamId, newReceiver);
+            return newReceiver;
         }
     }
 }

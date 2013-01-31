@@ -45,7 +45,7 @@
     <Compile Include="Constants.cs" />
     <Compile Include="FrameFragmentReader.cs" />
     <Compile Include="FrameWriter.cs" />
-    <Compile Include="Stream.cs" />
+    <Compile Include="Channel.cs" />
     <Compile Include="IFrameFragmentReader.cs" />
     <Compile Include="IFrameWriter.cs" />
     <Compile Include="ITransportReader.cs" />

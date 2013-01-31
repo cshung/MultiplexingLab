@@ -3,6 +3,7 @@
     using Common;
     using Multiplexer;
     using System;
+    using System.IO;
     using System.Net;
     using System.Net.Sockets;
     using System.Threading;
@@ -63,56 +64,27 @@
 
         private class Executor
         {
-            private Stream stream;
+            private Channel channel;
             private Program program;
             private byte[] buffer = new byte[1];
 
             public Executor(Connection connection, Program program)
             {
-                this.stream = connection.CreateStream();
+                this.channel = connection.CreateStream();
                 this.program = program;
             }
 
             internal void Run(byte value)
             {
-                byte[] buffer = new byte[value];
-                for (byte i = 0; i < value; i++)
+                using (StreamWriter writer = new StreamWriter(this.channel))
                 {
-                    buffer[i] = i;
+                    writer.WriteLine("Sending over " + value + " to server");
+                    writer.Flush();
+                    using (StreamReader reader = new StreamReader(this.channel))
+                    {
+                        Console.WriteLine(reader.ReadLine());
+                    }
                 }
-                this.stream.BeginWrite(buffer, 0, value, OnStreamWriteCompleted, this);
-            }
-
-            private static void OnStreamWriteCompleted(IAsyncResult ar)
-            {
-                Executor thisPtr = (Executor)ar.AsyncState;
-                thisPtr.stream.EndWrite(ar);
-                thisPtr.OnStreamWriteCompleted();
-            }
-
-            private void OnStreamWriteCompleted()
-            {
-                //this.stream.BeginRead(buffer, 0, 1, OnStreamReadCompleted, this);
-                this.program.OnExecutionCompleted();
-            }
-
-            private static void OnStreamReadCompleted(IAsyncResult ar)
-            {
-                Executor thisPtr = (Executor)ar.AsyncState;
-                int count = thisPtr.stream.EndRead(ar);
-                thisPtr.OnStreamReadCompleted(count);
-            }
-
-            private void OnStreamReadCompleted(int count)
-            {
-                Console.WriteLine("Got response!");
-                Console.WriteLine(count);
-                for (int i = 0; i < count; i++)
-                {
-                    Console.WriteLine(buffer[i]);
-                }
-
-                this.program.OnExecutionCompleted();
             }
         }
     }

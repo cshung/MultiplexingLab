@@ -22,23 +22,31 @@
                     nextFrameSize = sizeRemaining;
                 }
 
-                byte[] header = new byte[8];
+                FrameHeader header = new FrameHeader(0, nextFrameSize, streamId);
 
-                header[0] = (byte)((nextFrameSize & 0xF000) / 0x1000);
-                header[1] = (byte)((nextFrameSize & 0x0F00) / 0x0100);
-                header[2] = (byte)((nextFrameSize & 0x00F0) / 0x0010);
-                header[3] = (byte)((nextFrameSize & 0x000F) / 0x0001);
-
-                header[4] = (byte)((streamId & 0xF000) / 0x1000);
-                header[5] = (byte)((streamId & 0x0F00) / 0x0100);
-                header[6] = (byte)((streamId & 0x00F0) / 0x0010);
-                header[7] = (byte)((streamId & 0x000F) / 0x0001);
-
-                writeFrames.Add(new WriteFrame(new ArraySegment<byte>(header, 0, 8), new ArraySegment<byte>(buffer.Array, current, nextFrameSize), this));
+                writeFrames.Add(new WriteFrame(new ArraySegment<byte>(header.Encode(), 0, Constants.HeaderLength), new ArraySegment<byte>(buffer.Array, current, nextFrameSize), this));
                 current += nextFrameSize;
                 sizeRemaining -= nextFrameSize;
             }
 
+            bool completedSynchronously = frameWriter.BeginWriteFrames(writeFrames);
+            if (completedSynchronously)
+            {
+                base.Complete(null, true);
+            }
+            else
+            {
+                this.incompleteFrameCounts = writeFrames.Count;
+            }
+        }
+
+        // TODO: Naming?
+        internal WriteAsyncResult(IFrameWriter frameWriter, AsyncCallback callback, object state)
+            : base(callback, state, frameWriter, "Close")
+        {
+            // The frame decoder requires at least one byte per frame to decode correctly
+            // TODO: Get rid of this constraint
+            List<WriteFrame> writeFrames = new List<WriteFrame> { new WriteFrame(new ArraySegment<byte>(new FrameHeader(1, 1, 0).Encode(), 0, Constants.HeaderLength), new ArraySegment<byte>(new byte[1], 0, 1), this) };
             bool completedSynchronously = frameWriter.BeginWriteFrames(writeFrames);
             if (completedSynchronously)
             {

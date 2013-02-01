@@ -10,7 +10,7 @@
     {
         private Socket socket;
         private int streamId;
-        private ConcurrentDictionary<int, Channel> streams;
+        private ConcurrentDictionary<int, Channel> channels;
 
         private FrameWriter frameWriter;
         private FrameFragmentReader frameFragmentReader;
@@ -18,7 +18,7 @@
         public Connection(Socket socket)
         {
             this.socket = socket;
-            this.streams = new ConcurrentDictionary<int, Channel>();
+            this.channels = new ConcurrentDictionary<int, Channel>();
             this.frameWriter = new FrameWriter(new TcpWriter(socket));
             this.frameFragmentReader = new FrameFragmentReader(new TcpReader(socket));
         }
@@ -28,7 +28,7 @@
             int nextStreamId = Interlocked.Increment(ref this.streamId);
             Sender sender = new Sender(this.frameWriter, nextStreamId);
             Channel newStream = new Channel(sender, this.frameFragmentReader.CreateReceiver(nextStreamId));
-            this.streams.TryAdd(nextStreamId, newStream);
+            this.channels.TryAdd(nextStreamId, newStream);
             // TODO: Can it fail?
             return newStream;
         }
@@ -44,15 +44,15 @@
             return new Channel(new Sender(this.frameWriter, receiver.StreamId), receiver);
         }
 
-        // TODO: Implement close 
-        public void BeginClose(AsyncCallback callback, object state)
+        public IAsyncResult BeginClose(AsyncCallback callback, object state)
         {
-            //throw new NotImplementedException();
+            return this.frameWriter.BeginClose(callback, state);
         }
 
         public void EndClose(IAsyncResult ar)
         {
-            //throw new NotImplementedException();
+            this.frameWriter.EndClose(ar);
+            this.socket.Close();
         }
     }
 }

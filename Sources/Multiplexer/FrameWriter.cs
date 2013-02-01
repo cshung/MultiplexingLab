@@ -152,5 +152,20 @@
                 thisPtr.OnTransportWriteCompleted(thisPtr.transportWriter.EndWrite(ar));
             }
         }
+
+        internal IAsyncResult BeginClose(AsyncCallback callback, object state)
+        {
+            return new WriteAsyncResult(this, callback, state);
+        }
+
+        internal void EndWrite(IAsyncResult ar)
+        {
+            AsyncResult.End(ar, this, "Write");
+        }
+
+        internal void EndClose(IAsyncResult ar)
+        {
+            AsyncResult.End(ar, this, "Close");
+        }
     }
 }

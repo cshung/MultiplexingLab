@@ -44,6 +44,7 @@
     <Compile Include="Connection.cs" />
     <Compile Include="Constants.cs" />
     <Compile Include="FrameFragmentReader.cs" />
+    <Compile Include="FrameHeader.cs" />
     <Compile Include="FrameWriter.cs" />
     <Compile Include="Channel.cs" />
     <Compile Include="IFrameFragmentReader.cs" />

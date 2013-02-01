@@ -21,5 +21,10 @@
         {
             return socket.EndReceive(ar);
         }
+
+        public void Close()
+        {
+            this.socket.Close();
+        }
     }
 }

@@ -22,5 +22,10 @@
         {
             return this.socket.EndSend(ar);
         }
+
+        public void Close()
+        {
+            this.socket.Close();
+        }
     }
 }

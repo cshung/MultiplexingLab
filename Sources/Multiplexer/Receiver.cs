@@ -56,7 +56,7 @@
                 Buffer.BlockCopy(lastBlock.Value.Array, lastBlock.Value.Offset, buffer, bufferPointer, lengthToCopy);
                 if (lastBlockCompleted)
                 {
-                    this.frameFragmentReader.ArraySegmentCompleted();
+                    this.frameFragmentReader.OnSegmentCompleted();
                     lastBlock = null;
                 }
 
@@ -87,7 +87,7 @@
                     }
                     else
                     {
-                        this.frameFragmentReader.ArraySegmentCompleted();
+                        this.frameFragmentReader.OnSegmentCompleted();
                     }
                 }
                 else

@@ -8,5 +8,7 @@
         IAsyncResult BeginWrite(IList<ArraySegment<byte>> buffers, AsyncCallback callback, object state);
 
         int EndWrite(IAsyncResult ar);
+
+        void Close();
     }
 }

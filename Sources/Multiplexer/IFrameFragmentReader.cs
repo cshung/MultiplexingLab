@@ -2,6 +2,6 @@
 {
     internal interface IFrameFragmentReader
     {
-        void ArraySegmentCompleted();
+        void OnSegmentCompleted();
     }
 }

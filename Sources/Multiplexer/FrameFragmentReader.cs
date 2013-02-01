@@ -11,13 +11,12 @@
         private ITransportReader transportReader;
         private byte[] buffer;
         private bool bufferFull;
-        private int segmentCount;
+        private int unconsumedSegmentCount;
         private int bufferStart = 0;
 
         // Frame decoding state that need to go cross trunks
         private bool lastFramePayloadIncomplete;
-        private int lastIncompletePayloadStreamId;
-        private int lastIncompletePayloadRemainingSize;
+        private FrameHeader lastIncompletePayloadHeader;
 
         private bool lastFrameHeaderIncomplete;
         private List<byte> lastIncompleteHeader;
@@ -25,6 +24,8 @@
         private ConcurrentQueue<Receiver> newReceivers;
         private ConcurrentQueue<AcceptAsyncResult> pendingAcceptRequests;
         private ConcurrentDictionary<int, Receiver> receivers;
+
+        private bool shouldClose;
 
         internal FrameFragmentReader(ITransportReader transportReader)
         {
@@ -36,10 +37,10 @@
             this.BeginFillBuffer();
         }
 
-        public void ArraySegmentCompleted()
+        public void OnSegmentCompleted()
         {
             // If the reading of network is stopped because buffer is full, and all segnent created are comsumed, then read again
-            if (Interlocked.Decrement(ref this.segmentCount) == 0)
+            if (Interlocked.Decrement(ref this.unconsumedSegmentCount) == 0)
             {
                 if (bufferFull)
                 {
@@ -80,11 +81,18 @@
 
         private void BeginFillBuffer()
         {
-            IAsyncResult ar = this.transportReader.BeginRead(buffer, this.bufferStart, this.buffer.Length - this.bufferStart, OnTransportReadCallback, this);
-            if (ar.CompletedSynchronously)
+            if (!shouldClose)
             {
-                int byteRead = this.transportReader.EndRead(ar);
-                this.OnTransportRead(byteRead);
+                IAsyncResult ar = this.transportReader.BeginRead(buffer, this.bufferStart, this.buffer.Length - this.bufferStart, OnTransportReadCallback, this);
+                if (ar.CompletedSynchronously)
+                {
+                    int byteRead = this.transportReader.EndRead(ar);
+                    this.OnTransportRead(byteRead);
+                }
+            }
+            else
+            {
+                this.transportReader.Close();
             }
         }
 
@@ -102,29 +110,17 @@
                 if (this.lastFrameHeaderIncomplete)
                 {
                     this.lastFrameHeaderIncomplete = false;
-                    while (lastIncompleteHeader.Count < 8 && sizeRemaining > 0)
+                    while (lastIncompleteHeader.Count < Constants.HeaderLength && sizeRemaining > 0)
                     {
                         lastIncompleteHeader.Add(this.buffer[decodingPointer]);
                         decodingPointer++;
                         sizeRemaining--;
                     }
-                    if (lastIncompleteHeader.Count == 8)
+                    if (lastIncompleteHeader.Count == Constants.HeaderLength)
                     {
+                        FrameHeader header = FrameHeader.Decode(this.lastIncompleteHeader);
 
-                        // TODO: Remove this duplicated code
-                        int lengthA = this.lastIncompleteHeader[0];
-                        int lengthB = this.lastIncompleteHeader[1];
-                        int lengthC = this.lastIncompleteHeader[2];
-                        int lengthD = this.lastIncompleteHeader[3];
-                        int length = lengthA * 0x1000 + lengthB * 0x0100 + lengthC * 0x0010 + lengthD * 0x0001;
-
-                        int streamA = this.lastIncompleteHeader[4];
-                        int streamB = this.lastIncompleteHeader[5];
-                        int streamC = this.lastIncompleteHeader[6];
-                        int streamD = this.lastIncompleteHeader[7];
-                        int streamId = streamA * 0x1000 + streamB * 0x0100 + streamC * 0x0010 + streamD * 0x0001;
-
-                        int consumed = DecodePayload(decodingPointer, sizeRemaining, length, streamId);
+                        int consumed = DecodePayload(decodingPointer, sizeRemaining, header);
                         decodingPointer += consumed;
                         sizeRemaining -= consumed;
                     }
@@ -136,31 +132,21 @@
                 else if (this.lastFramePayloadIncomplete)
                 {
                     this.lastFramePayloadIncomplete = false;
-                    int consumed = DecodePayload(decodingPointer, sizeRemaining, this.lastIncompletePayloadRemainingSize, this.lastIncompletePayloadStreamId);
+                    int consumed = DecodePayload(decodingPointer, sizeRemaining, this.lastIncompletePayloadHeader);
                     decodingPointer += consumed;
                     sizeRemaining -= consumed;
                 }
                 else
                 {
                     // Can I grab the whole header?
-                    if (sizeRemaining >= 8)
+                    if (sizeRemaining >= Constants.HeaderLength)
                     {
-                        int lengthA = this.buffer[decodingPointer + 0];
-                        int lengthB = this.buffer[decodingPointer + 1];
-                        int lengthC = this.buffer[decodingPointer + 2];
-                        int lengthD = this.buffer[decodingPointer + 3];
-                        int length = lengthA * 0x1000 + lengthB * 0x0100 + lengthC * 0x0010 + lengthD * 0x0001;
+                        FrameHeader header = FrameHeader.Decode(new ArraySegment<byte>(this.buffer, decodingPointer, Constants.HeaderLength));
 
-                        int streamA = this.buffer[decodingPointer + 4];
-                        int streamB = this.buffer[decodingPointer + 5];
-                        int streamC = this.buffer[decodingPointer + 6];
-                        int streamD = this.buffer[decodingPointer + 7];
-                        int streamId = streamA * 0x1000 + streamB * 0x0100 + streamC * 0x0010 + streamD * 0x0001;
+                        decodingPointer += Constants.HeaderLength;
+                        sizeRemaining -= Constants.HeaderLength;
 
-                        decodingPointer += 8;
-                        sizeRemaining -= 8;
-
-                        int consumed = DecodePayload(decodingPointer, sizeRemaining, length, streamId);
+                        int consumed = DecodePayload(decodingPointer, sizeRemaining, header);
 
                         decodingPointer += consumed;
                         sizeRemaining -= consumed;
@@ -201,7 +187,7 @@
             }
             else
             {
-                if (this.segmentCount == 0)
+                if (this.unconsumedSegmentCount == 0)
                 {
                     this.bufferStart = 0;
                     this.BeginFillBuffer();
@@ -213,15 +199,26 @@
             }
         }
 
-        private int DecodePayload(int decodingPointer, int sizeRemaining, int length, int streamId)
+        private int DecodePayload(int decodingPointer, int sizeRemaining, FrameHeader header)
         {
+            byte flag = header.Flag;
+            int length = header.Length;
+            int streamId = header.StreamId;
             int consumed;
+
+            if (flag == 1)
+            {
+                this.shouldClose = true;
+            }
 
             // Can I grab the whole payload?
             if (sizeRemaining >= length)
             {
-                ArraySegment<byte> payload = new ArraySegment<byte>(buffer, decodingPointer, length);
-                EnqueuePayload(streamId, payload);
+                if (length > 0)
+                {
+                    ArraySegment<byte> payload = new ArraySegment<byte>(buffer, decodingPointer, length);
+                    EnqueuePayload(streamId, payload);
+                }
 
                 consumed = length;
             }
@@ -233,8 +230,8 @@
                     EnqueuePayload(streamId, payload);
                 }
                 this.lastFramePayloadIncomplete = true;
-                this.lastIncompletePayloadStreamId = streamId;
-                this.lastIncompletePayloadRemainingSize = length - sizeRemaining;
+                // TODO: When a frame is split - is it always true that duplicating the flag make sense?
+                this.lastIncompletePayloadHeader = new FrameHeader(flag, length - sizeRemaining, streamId);
 
                 consumed = sizeRemaining;
             }
@@ -243,17 +240,20 @@
 
         private void EnqueuePayload(int streamId, ArraySegment<byte> payload)
         {
-            Receiver receiver;
-            if (!this.receivers.TryGetValue(streamId, out receiver))
+            if (streamId != 0)
             {
-                receiver = new Receiver(this, streamId);
-                // TODO, possible to fail at all?
-                this.receivers.TryAdd(streamId, receiver);
-                this.newReceivers.Enqueue(receiver);
-            }
+                Receiver receiver;
+                if (!this.receivers.TryGetValue(streamId, out receiver))
+                {
+                    receiver = new Receiver(this, streamId);
+                    // TODO, possible to fail at all?
+                    this.receivers.TryAdd(streamId, receiver);
+                    this.newReceivers.Enqueue(receiver);
+                }
 
-            receiver.Enqueue(payload);
-            Interlocked.Increment(ref this.segmentCount);
+                receiver.Enqueue(payload);
+                Interlocked.Increment(ref this.unconsumedSegmentCount);
+            }
         }
 
         private static void OnTransportReadCallback(IAsyncResult ar)

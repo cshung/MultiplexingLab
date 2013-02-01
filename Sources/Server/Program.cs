@@ -7,6 +7,7 @@
     using System.Net;
     using System.Net.Sockets;
     using System.Threading;
+    using System.Threading.Tasks;
 
     internal class Program
     {
@@ -39,6 +40,7 @@
             Console.WriteLine("[Server] Accepting TCP connection");
             this.listener.BeginAcceptTcpClient(OnAccept, this);
             new ConnectionHandler(client);
+            //new DebuggingConnectionHandler(client);
         }
     }
 
@@ -52,7 +54,7 @@
         public DebuggingConnectionHandler(TcpClient client)
         {
             this.stream = client.GetStream();
-            Next();
+            this.Next();
         }
 
         private void Next()
@@ -112,30 +114,23 @@
 
     public class StreamHandler
     {
-        private Channel channel;
         private Guid identity;
 
         public StreamHandler(Channel channel)
         {
             this.identity = Guid.NewGuid();
-            this.channel = channel;
-            // Stream processing code must not block on stream operation - that will lead to deadlock
-            ThreadPool.QueueUserWorkItem(HandleChannel, this);
+            this.HandleStreamAsync(channel);
         }
 
-        private static void HandleChannel(object state)
+        private async Task HandleStreamAsync(Channel channel)
         {
-            StreamHandler thisPtr = (StreamHandler)state;
-            thisPtr.HandleChannel();            
-        }
-
-        private void HandleChannel()
-        {
-            using (StreamReader reader = new StreamReader(this.channel))
+            using (StreamReader reader = new StreamReader(channel))
             {
-                using (StreamWriter writer = new StreamWriter(this.channel))
+                string line = await reader.ReadLineAsync();
+                Console.WriteLine(line);
+                using (StreamWriter writer = new StreamWriter(channel))
                 {
-                    writer.WriteLine(reader.ReadLine());
+                    writer.WriteLineAsync(line);
                 }
             }
         }

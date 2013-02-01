@@ -7,5 +7,7 @@
         IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state);
 
         int EndRead(IAsyncResult ar);
+
+        void Close();
     }
 }

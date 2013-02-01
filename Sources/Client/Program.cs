@@ -37,6 +37,7 @@
         private void OnConnectCompleted()
         {
             this.connection = new Connection(this.client.Client);
+            this.requestCount = 3;
             ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(13); }, this);
             ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(4); }, this);
             ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(27); }, this);
@@ -44,7 +45,7 @@
 
         private void OnExecutionCompleted()
         {
-            if (Interlocked.Increment(ref this.requestCount) == 3)
+            if (Interlocked.Decrement(ref this.requestCount) == 0)
             {
                 this.connection.BeginClose(OnConnectionClosed, this);
             }
@@ -85,6 +86,7 @@
                         Console.WriteLine(reader.ReadLine());
                     }
                 }
+                program.OnExecutionCompleted();
             }
         }
     }

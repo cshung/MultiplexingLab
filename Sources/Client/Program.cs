@@ -17,7 +17,18 @@
 
         private static void Main(string[] args)
         {
+            ThreadPool.QueueUserWorkItem(DumpLog);
             new Program().Run();
+        }
+
+        private static void DumpLog(object state)
+        {
+            while (true)
+            {
+                Console.ReadLine();
+                Logger.Dump();
+                Logger.Clean();
+            }
         }
 
         private void Run()
@@ -37,10 +48,10 @@
         private void OnConnectCompleted()
         {
             this.connection = new Connection(this.client.Client);
-            this.requestCount = 3;
+            this.requestCount = 2;
             ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(13); }, this);
             ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(4); }, this);
-            ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(27); }, this);
+            //ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(27); }, this);
         }
 
         private void OnExecutionCompleted()
@@ -71,7 +82,7 @@
 
             public Executor(Connection connection, Program program)
             {
-                this.channel = connection.CreateStream();
+                this.channel = connection.CreateChannel();
                 this.program = program;
             }
 
@@ -79,11 +90,16 @@
             {
                 using (StreamWriter writer = new StreamWriter(this.channel))
                 {
-                    writer.WriteLine("Sending over " + value + " to server");
+                    string request = "Sending over " + value + " to server";
+                    writer.WriteLine(request);
                     writer.Flush();
                     using (StreamReader reader = new StreamReader(this.channel))
                     {
-                        Console.WriteLine(reader.ReadLine());
+                        string response = reader.ReadLine();
+                        if (!string.Equals(request, response))
+                        {
+                            Console.WriteLine("Inconsistent reply detected");
+                        }
                     }
                 }
                 program.OnExecutionCompleted();

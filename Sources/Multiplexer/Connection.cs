@@ -23,13 +23,13 @@
             this.frameFragmentReader = new FrameFragmentReader(new TcpReader(socket));
         }
 
-        public Channel CreateStream()
+        public Channel CreateChannel()
         {
             int nextStreamId = Interlocked.Increment(ref this.streamId);
             Sender sender = new Sender(this.frameWriter, nextStreamId);
             Channel newStream = new Channel(sender, this.frameFragmentReader.CreateReceiver(nextStreamId));
+            // TODO, possible to fail at all?
             this.channels.TryAdd(nextStreamId, newStream);
-            // TODO: Can it fail?
             return newStream;
         }
 

@@ -51,6 +51,7 @@
     <Compile Include="IFrameWriter.cs" />
     <Compile Include="ITransportReader.cs" />
     <Compile Include="ITransportWriter.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReadAsyncResult.cs" />
     <Compile Include="Receiver.cs" />

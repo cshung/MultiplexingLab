@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Text;
     using System.Threading;
 
     internal class FrameWriter : IFrameWriter
@@ -46,6 +47,8 @@
             return result;
         }
 
+        private List<string> allTransports = new List<string>();
+
         private bool BeginWriteAllFrames(IEnumerable<List<WriteFrame>> writingRequests)
         {
             foreach (List<WriteFrame> writingRequest in writingRequests)
@@ -59,6 +62,25 @@
             }
 
             IAsyncResult ar = this.transportWriter.BeginWrite(this.writingSegments, OnTransportWriteCompletedCallback, this);
+
+            //StringBuilder sb = new StringBuilder();
+            //foreach (var segment in this.writingSegments)
+            //{
+            //    foreach (var dataWrite in segment)
+            //    {
+            //        if (dataWrite >= 32)
+            //        {
+            //            sb.Append((char)dataWrite);
+            //        }
+            //        else
+            //        {
+            //            sb.Append(string.Format("({0})", dataWrite));
+            //        }
+            //    }
+            //}
+
+            //this.allTransports.Add(sb.ToString());
+            //Logger.Log("Transport Write: " + string.Join("", allTransports));
 
             if (ar.CompletedSynchronously)
             {

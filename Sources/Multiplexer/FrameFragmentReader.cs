@@ -4,20 +4,21 @@
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Text;
     using System.Threading;
 
     internal class FrameFragmentReader : IFrameFragmentReader
     {
         private ITransportReader transportReader;
         private byte[] buffer;
-        private bool bufferFull;
+
+        // These fields could be accessed by multiple threads at the same time using Interlocked.
+        private int segmentCompletedShouldTriggerRead;
         private int unconsumedSegmentCount;
-        private int bufferStart = 0;
 
         // Frame decoding state that need to go cross trunks
         private bool lastFramePayloadIncomplete;
         private FrameHeader lastIncompletePayloadHeader;
-
         private bool lastFrameHeaderIncomplete;
         private List<byte> lastIncompleteHeader;
 
@@ -34,19 +35,17 @@
             this.receivers = new ConcurrentDictionary<int, Receiver>();
             this.newReceivers = new ConcurrentQueue<Receiver>();
             this.pendingAcceptRequests = new ConcurrentQueue<AcceptAsyncResult>();
-            this.BeginFillBuffer();
+            this.BeginFillBuffer(0);
         }
 
         public void OnSegmentCompleted()
         {
-            // If the reading of network is stopped because buffer is full, and all segnent created are comsumed, then read again
+            // If the reading of network is stopped because buffer is full, and all segments created are comsumed, then read again
             if (Interlocked.Decrement(ref this.unconsumedSegmentCount) == 0)
             {
-                if (bufferFull)
+                if (Interlocked.CompareExchange(ref this.segmentCompletedShouldTriggerRead, 0, 1) == 1)
                 {
-                    this.bufferFull = false;
-                    this.bufferStart = 0;
-                    this.BeginFillBuffer();
+                    this.BeginFillBuffer(0);
                 }
             }
         }
@@ -79,15 +78,21 @@
             return newReceiver;
         }
 
-        private void BeginFillBuffer()
+        private class ReadState
         {
+            public FrameFragmentReader ThisPtr { get; set; }
+            public int BufferStart { get; set; }
+        }
+
+        private void BeginFillBuffer(int bufferStart)
+        {            
             if (!shouldClose)
             {
-                IAsyncResult ar = this.transportReader.BeginRead(buffer, this.bufferStart, this.buffer.Length - this.bufferStart, OnTransportReadCallback, this);
+                IAsyncResult ar = this.transportReader.BeginRead(buffer, bufferStart, this.buffer.Length - bufferStart, OnTransportReadCallback, new ReadState { ThisPtr = this, BufferStart = bufferStart});
                 if (ar.CompletedSynchronously)
                 {
                     int byteRead = this.transportReader.EndRead(ar);
-                    this.OnTransportRead(byteRead);
+                    this.OnTransportRead(byteRead, bufferStart);
                 }
             }
             else
@@ -96,14 +101,36 @@
             }
         }
 
-        private void OnTransportRead(int byteRead)
+        private List<string> allTransports = new List<string>();
+
+        private void OnTransportRead(int byteRead, int bufferStart)
         {
-            int decodingBufferStart = this.bufferStart;
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < byteRead; i++)
+            {
+                byte dataRead = this.buffer[bufferStart + i];
+                if (dataRead >= 32)
+                {
+                    sb.Append((char)dataRead);
+                }
+                else
+                {
+                    sb.Append(string.Format("({0})", dataRead));
+                }
+            }
+
+            allTransports.Add(sb.ToString());
+            Logger.Log("Transport Read: " + string.Join("", allTransports));
+
+            int decodingBufferStart = bufferStart;
             int decodingBufferSize = byteRead;
 
             // Decoding the buffer here to make sure the decoding process is not run concurrently
             int decodingPointer = decodingBufferStart;
             int sizeRemaining = decodingBufferSize;
+
+            // Buffering the decoded payload so that we don't notify receiver before we are done with the parsing
+            Dictionary<int, List<ArraySegment<byte>>> decodedPayloadLists = new Dictionary<int, List<ArraySegment<byte>>>();
 
             while (sizeRemaining > 0)
             {
@@ -120,7 +147,7 @@
                     {
                         FrameHeader header = FrameHeader.Decode(this.lastIncompleteHeader);
 
-                        int consumed = DecodePayload(decodingPointer, sizeRemaining, header);
+                        int consumed = DecodePayload(decodingPointer, sizeRemaining, header, decodedPayloadLists);
                         decodingPointer += consumed;
                         sizeRemaining -= consumed;
                     }
@@ -132,7 +159,7 @@
                 else if (this.lastFramePayloadIncomplete)
                 {
                     this.lastFramePayloadIncomplete = false;
-                    int consumed = DecodePayload(decodingPointer, sizeRemaining, this.lastIncompletePayloadHeader);
+                    int consumed = DecodePayload(decodingPointer, sizeRemaining, this.lastIncompletePayloadHeader, decodedPayloadLists);
                     decodingPointer += consumed;
                     sizeRemaining -= consumed;
                 }
@@ -146,7 +173,7 @@
                         decodingPointer += Constants.HeaderLength;
                         sizeRemaining -= Constants.HeaderLength;
 
-                        int consumed = DecodePayload(decodingPointer, sizeRemaining, header);
+                        int consumed = DecodePayload(decodingPointer, sizeRemaining, header, decodedPayloadLists);
 
                         decodingPointer += consumed;
                         sizeRemaining -= consumed;
@@ -165,7 +192,7 @@
                 }
             }
 
-            // Done Parsing: Notify any pending accepts
+            // Done Parsing: Notify any pending accepts            
             while (pendingAcceptRequests.Count > 0 && this.newReceivers.Count > 0)
             {
                 AcceptAsyncResult pendingAcceptRequest;
@@ -180,26 +207,33 @@
                 pendingAcceptRequest.OnReceiverAvailable(newReceiver, false);
             }
 
-            if (decodingPointer != buffer.Length)
+            if (decodingPointer == buffer.Length)
             {
-                this.bufferStart = decodingPointer;
-                this.BeginFillBuffer();
+                decodingPointer = 0;
+                if (this.unconsumedSegmentCount > 0)
+                {
+                    this.segmentCompletedShouldTriggerRead = 1;
+                }
             }
-            else
+            int mySegmentCompletedShouldTriggerRead = this.segmentCompletedShouldTriggerRead;
+
+            // Done Parsing: Notify any receivers
+            foreach (KeyValuePair<int, List<ArraySegment<byte>>> decodedPayloadList in decodedPayloadLists)
             {
-                if (this.unconsumedSegmentCount == 0)
+                Receiver receiver = this.receivers[decodedPayloadList.Key];
+                foreach (ArraySegment<byte> decodedPayload in decodedPayloadList.Value)
                 {
-                    this.bufferStart = 0;
-                    this.BeginFillBuffer();
+                    receiver.Enqueue(decodedPayload);
                 }
-                else
-                {
-                    this.bufferFull = true;
-                }
+            }
+
+            if (mySegmentCompletedShouldTriggerRead == 0)
+            {
+                this.BeginFillBuffer(decodingPointer);
             }
         }
 
-        private int DecodePayload(int decodingPointer, int sizeRemaining, FrameHeader header)
+        private int DecodePayload(int decodingPointer, int sizeRemaining, FrameHeader header, Dictionary<int, List<ArraySegment<byte>>> decodedPayloadLists)
         {
             byte flag = header.Flag;
             int length = header.Length;
@@ -217,7 +251,7 @@
                 if (length > 0)
                 {
                     ArraySegment<byte> payload = new ArraySegment<byte>(buffer, decodingPointer, length);
-                    EnqueuePayload(streamId, payload);
+                    EnqueuePayload(streamId, payload, decodedPayloadLists);
                 }
 
                 consumed = length;
@@ -227,7 +261,7 @@
                 if (sizeRemaining > 0)
                 {
                     ArraySegment<byte> payload = new ArraySegment<byte>(buffer, decodingPointer, sizeRemaining);
-                    EnqueuePayload(streamId, payload);
+                    EnqueuePayload(streamId, payload, decodedPayloadLists);
                 }
                 this.lastFramePayloadIncomplete = true;
                 // TODO: When a frame is split - is it always true that duplicating the flag make sense?
@@ -238,7 +272,7 @@
             return consumed;
         }
 
-        private void EnqueuePayload(int streamId, ArraySegment<byte> payload)
+        private void EnqueuePayload(int streamId, ArraySegment<byte> payload, Dictionary<int, List<ArraySegment<byte>>> decodedPayloadLists)
         {
             if (streamId != 0)
             {
@@ -251,7 +285,14 @@
                     this.newReceivers.Enqueue(receiver);
                 }
 
-                receiver.Enqueue(payload);
+                List<ArraySegment<byte>> decodedPayloadList;
+                if (!decodedPayloadLists.TryGetValue(streamId, out decodedPayloadList))
+                {
+                    decodedPayloadList = new List<ArraySegment<byte>>();
+                    decodedPayloadLists.Add(streamId, decodedPayloadList);
+                }
+                decodedPayloadList.Add(payload);
+
                 Interlocked.Increment(ref this.unconsumedSegmentCount);
             }
         }
@@ -263,9 +304,10 @@
                 return;
             }
 
-            FrameFragmentReader thisPtr = (FrameFragmentReader)ar.AsyncState;
+            ReadState readState = (ReadState)ar.AsyncState;
+            FrameFragmentReader thisPtr = readState.ThisPtr;
             int byteRead = thisPtr.transportReader.EndRead(ar);
-            thisPtr.OnTransportRead(byteRead);
+            thisPtr.OnTransportRead(byteRead, readState.BufferStart);
         }
     }
 }

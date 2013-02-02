@@ -3,15 +3,16 @@
     using Common;
     using Multiplexer;
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Net;
     using System.Net.Sockets;
-    using System.Threading;
     using System.Threading.Tasks;
 
     internal class Program
     {
         private TcpListener listener;
+        private List<ConnectionHandler> connectionHandlers = new List<ConnectionHandler>();
 
         private static void Main(string[] args)
         {
@@ -25,7 +26,12 @@
             listener.BeginAcceptTcpClient(OnAccept, this);
             Console.WriteLine("[Server] Listening");
             Console.WriteLine("Press any key to stop");
-            Console.ReadLine();
+            while (true)
+            {
+                Console.ReadLine();
+                Logger.Dump();
+                Logger.Clean();
+            }
         }
 
         private static void OnAccept(IAsyncResult ar)
@@ -37,9 +43,9 @@
 
         private void OnAccept(TcpClient client)
         {
-            Console.WriteLine("[Server] Accepting TCP connection");
+            Logger.Log("[Server] Accepting TCP connection");
             this.listener.BeginAcceptTcpClient(OnAccept, this);
-            new ConnectionHandler(client);
+            this.connectionHandlers.Add(new ConnectionHandler(client));
             //new DebuggingConnectionHandler(client);
         }
     }
@@ -95,6 +101,7 @@
     public class ConnectionHandler
     {
         private Connection connection;
+        private List<ChannelHandler> channelHandlers = new List<ChannelHandler>();
 
         public ConnectionHandler(TcpClient client)
         {
@@ -104,19 +111,24 @@
 
         private static void OnAcceptedCallback(IAsyncResult ar)
         {
-            Console.WriteLine("[Server] Accepting Channel");
+            Logger.Log("[Server] Accepting Channel");
             ConnectionHandler thisPtr = (ConnectionHandler)ar.AsyncState;
             Channel stream = thisPtr.connection.EndAccept(ar);
-            thisPtr.connection.BeginAccept(OnAcceptedCallback, thisPtr);
-            new StreamHandler(stream);
+            thisPtr.OnAccepted(stream);
+        }
+
+        private void OnAccepted(Channel stream)
+        {
+            this.connection.BeginAccept(OnAcceptedCallback, this);
+            this.channelHandlers.Add(new ChannelHandler(stream));
         }
     }
 
-    public class StreamHandler
+    public class ChannelHandler
     {
         private Guid identity;
 
-        public StreamHandler(Channel channel)
+        public ChannelHandler(Channel channel)
         {
             this.identity = Guid.NewGuid();
             this.HandleStreamAsync(channel);
@@ -127,10 +139,11 @@
             using (StreamReader reader = new StreamReader(channel))
             {
                 string line = await reader.ReadLineAsync();
-                Console.WriteLine(line);
+                Logger.Log("Going to response with " + line);
                 using (StreamWriter writer = new StreamWriter(channel))
                 {
-                    writer.WriteLineAsync(line);
+                    await writer.WriteLineAsync(line);
+                    await writer.FlushAsync();
                 }
             }
         }

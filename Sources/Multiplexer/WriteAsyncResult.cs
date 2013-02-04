@@ -22,7 +22,7 @@
                     nextFrameSize = sizeRemaining;
                 }
 
-                FrameHeader header = new FrameHeader(0, nextFrameSize, streamId);
+                FrameHeader header = new FrameHeader(nextFrameSize, streamId);
 
                 writeFrames.Add(new WriteFrame(new ArraySegment<byte>(header.Encode(), 0, Constants.HeaderLength), new ArraySegment<byte>(buffer.Array, current, nextFrameSize), this));
                 current += nextFrameSize;
@@ -46,7 +46,7 @@
         {
             // The frame decoder requires at least one byte per frame to decode correctly
             // TODO: Get rid of this constraint
-            List<WriteFrame> writeFrames = new List<WriteFrame> { new WriteFrame(new ArraySegment<byte>(new FrameHeader(1, 1, 0).Encode(), 0, Constants.HeaderLength), new ArraySegment<byte>(new byte[1], 0, 1), this) };
+            List<WriteFrame> writeFrames = new List<WriteFrame> { new WriteFrame(new ArraySegment<byte>(new FrameHeader(1, 0).Encode(), 0, Constants.HeaderLength), new ArraySegment<byte>(new byte[1], 0, 1), this) };
             bool completedSynchronously = frameWriter.BeginWriteFrames(writeFrames);
             if (completedSynchronously)
             {

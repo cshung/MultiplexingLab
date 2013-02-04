@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Text;
     using System.Threading;
 
@@ -14,29 +15,38 @@
         private ReaderWriterLockSlim writingLock;
         private ConcurrentQueue<List<WriteFrame>> pendingRequests;
 
-        // This lists are manipulated on the I/O thread and therefore coordinated to have no multi-threaded access
-        private List<ArraySegment<byte>> writingSegments;
-        private List<WriteAsyncResult> writingResults;
-        private bool completedOneSegment;
+        private class WriteState
+        {
+            public WriteState(FrameWriter thisPtr)
+            {
+                this.ThisPtr = thisPtr;
+                this.WritingSegments = new List<ArraySegment<byte>>();
+                this.WritingResults = new List<WriteAsyncResult>();
+            }
+
+            internal FrameWriter ThisPtr { get; private set; }
+            internal List<ArraySegment<byte>> WritingSegments { get; private set; }
+            internal List<WriteAsyncResult> WritingResults { get; private set; }
+            internal bool CompletedOneSegment { get; set; }
+        }
 
         internal FrameWriter(ITransportWriter transportWriter)
         {
             this.transportWriter = transportWriter;
             this.pendingRequests = new ConcurrentQueue<List<WriteFrame>>();
-            this.writingSegments = new List<ArraySegment<byte>>();
-            this.writingResults = new List<WriteAsyncResult>();
             this.writingLock = new ReaderWriterLockSlim();
         }
 
         public bool BeginWriteFrames(List<WriteFrame> frames)
         {
-            bool result;
+            bool result = false;
+            IAsyncResult ar = null;
             this.writingLock.EnterReadLock();
             if (Interlocked.Exchange(ref this.writing, 1) == 0)
             {
                 // No write is in progress - let's write it out
                 List<List<WriteFrame>> writingRequests = new List<List<WriteFrame>> { frames };
-                result = this.BeginWriteAllFrames(writingRequests);
+                ar = this.BeginWriteAllFrames(writingRequests, new WriteState(this));                
             }
             else
             {
@@ -44,47 +54,45 @@
                 result = false;
             }
             this.writingLock.ExitReadLock();
+            if (ar != null)
+            {
+                result = ProcessBeginWriteAllFrameAsyncResult(ar);
+            }
             return result;
         }
 
-        private List<string> allTransports = new List<string>();
-
-        private bool BeginWriteAllFrames(IEnumerable<List<WriteFrame>> writingRequests)
+        private IAsyncResult BeginWriteAllFrames(IEnumerable<List<WriteFrame>> writingRequests, WriteState writeState)
         {
+            if (this.writing != 1)
+            {
+                Console.WriteLine("Hit Assertion - I expected this call to be protected");
+            }
+
             foreach (List<WriteFrame> writingRequest in writingRequests)
             {
                 foreach (WriteFrame writingFrame in writingRequest)
                 {
-                    this.writingSegments.Add(writingFrame.Header);
-                    this.writingSegments.Add(writingFrame.Payload);
-                    this.writingResults.Add(writingFrame.WriteAsyncResult);
+                    writeState.WritingSegments.Add(writingFrame.Header);
+                    writeState.WritingSegments.Add(writingFrame.Payload);
+                    writeState.WritingResults.Add(writingFrame.WriteAsyncResult);
                 }
             }
 
-            IAsyncResult ar = this.transportWriter.BeginWrite(this.writingSegments, OnTransportWriteCompletedCallback, this);
+            foreach (var segment in writeState.WritingSegments)
+            {
+                Logger.LogStream("Transport Write", segment);
+            }
 
-            //StringBuilder sb = new StringBuilder();
-            //foreach (var segment in this.writingSegments)
-            //{
-            //    foreach (var dataWrite in segment)
-            //    {
-            //        if (dataWrite >= 32)
-            //        {
-            //            sb.Append((char)dataWrite);
-            //        }
-            //        else
-            //        {
-            //            sb.Append(string.Format("({0})", dataWrite));
-            //        }
-            //    }
-            //}
-
-            //this.allTransports.Add(sb.ToString());
-            //Logger.Log("Transport Write: " + string.Join("", allTransports));
-
+            IAsyncResult ar = this.transportWriter.BeginWrite(writeState.WritingSegments, OnTransportWriteCompletedCallback, writeState);
+            return ar;
+        }
+        
+        private bool ProcessBeginWriteAllFrameAsyncResult(IAsyncResult ar)
+        {
             if (ar.CompletedSynchronously)
             {
-                this.OnTransportWriteCompleted(this.transportWriter.EndWrite(ar));
+                WriteState writeState = (WriteState)ar.AsyncState;
+                this.OnTransportWriteCompleted(this.transportWriter.EndWrite(ar), writeState);
                 return true;
             }
             else
@@ -93,15 +101,20 @@
             }
         }
 
-        private void OnTransportWriteCompleted(int byteWritten)
+        private void OnTransportWriteCompleted(int byteWritten, WriteState writeState)
         {
+            if (this.writing != 1)
+            {
+                Console.WriteLine("Hit Assertion - I expected this call to be protected");
+            }
+
             int byteCompleted = 0;
             int byteRemaining = byteWritten;
             while (byteCompleted < byteWritten)
             {
                 // Pick a frame from the window
-                ArraySegment<byte> segment = this.writingSegments[0];
-                this.writingSegments.RemoveAt(0);
+                ArraySegment<byte> segment = writeState.WritingSegments[0];
+                writeState.WritingSegments.RemoveAt(0);
 
                 // Can I complete this frame?
                 if (byteRemaining >= segment.Count)
@@ -109,25 +122,30 @@
                     // Complete it
                     byteCompleted += segment.Count;
                     byteRemaining -= segment.Count;
-                    if (this.completedOneSegment)
+                    if (writeState.CompletedOneSegment)
                     {
-                        this.completedOneSegment = false;
-                        WriteAsyncResult completedResult = this.writingResults[0];
-                        this.writingResults.RemoveAt(0);
+                        writeState.CompletedOneSegment = false;
+                        WriteAsyncResult completedResult = writeState.WritingResults[0];
+                        writeState.WritingResults.RemoveAt(0);
                         completedResult.OnFrameCompleted();
                     }
                     else
                     {
-                        this.completedOneSegment = true;
+                        writeState.CompletedOneSegment = true;
                     }
                 }
                 else
                 {
                     ArraySegment<byte> incompleteSegment = new ArraySegment<byte>(segment.Array, segment.Offset + byteRemaining, segment.Count - byteRemaining);
-                    this.writingSegments.Insert(0, incompleteSegment);
+                    writeState.WritingSegments.Insert(0, incompleteSegment);
                     byteCompleted = byteWritten;
                     byteRemaining = 0;
                 }
+            }
+
+            if (this.writing != 1)
+            {
+                Console.WriteLine("Hit Assertion - I expected this call to be protected");
             }
 
             // drain this.pendingRequest and continue to write if any.
@@ -145,21 +163,23 @@
                     writingRequests.Add(writingRequest);
                 }
 
-                if (this.writingSegments.Count == 0 && writingRequests.Count == 0)
+                if (writeState.WritingSegments.Count == 0 && writingRequests.Count == 0)
                 {
+                    bool shouldReturn = false;
                     this.writingLock.EnterWriteLock();
                     if (this.pendingRequests.Count == 0)
                     {
-                        this.writing = 0;
+                        Interlocked.Exchange(ref this.writing, 0);
+                        shouldReturn = true;
                     }
                     this.writingLock.ExitWriteLock();
-                    if (this.writing == 0)
+                    if (shouldReturn)
                     {
                         return;
                     }
                 }
             } while (writingRequests.Count == 0);
-            this.BeginWriteAllFrames(writingRequests);
+            this.ProcessBeginWriteAllFrameAsyncResult(this.BeginWriteAllFrames(writingRequests, writeState));
         }
 
         private static void OnTransportWriteCompletedCallback(IAsyncResult ar)
@@ -170,8 +190,9 @@
             }
             else
             {
-                FrameWriter thisPtr = (FrameWriter)ar.AsyncState;
-                thisPtr.OnTransportWriteCompleted(thisPtr.transportWriter.EndWrite(ar));
+                WriteState writeState = (WriteState)ar.AsyncState;
+                FrameWriter thisPtr = writeState.ThisPtr;
+                thisPtr.OnTransportWriteCompleted(thisPtr.transportWriter.EndWrite(ar), writeState);
             }
         }
 

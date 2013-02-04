@@ -49,9 +49,10 @@
         {
             this.connection = new Connection(this.client.Client);
             this.requestCount = 2;
-            ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(13); }, this);
-            ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(4); }, this);
-            //ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run(27); }, this);
+            for (int i = 0; i < this.requestCount; i++)
+            {
+	            ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run((int)state); }, i);
+            }
         }
 
         private void OnExecutionCompleted()
@@ -86,16 +87,24 @@
                 this.program = program;
             }
 
-            internal void Run(byte value)
+            internal void Run(int value)
             {
                 using (StreamWriter writer = new StreamWriter(this.channel))
                 {
-                    string request = "Sending over " + value + " to server";
-                    writer.WriteLine(request);
-                    writer.Flush();
                     using (StreamReader reader = new StreamReader(this.channel))
                     {
+                        string request = "Sending over " + value + " to server";
+                        writer.WriteLine(request);
+                        writer.Flush();
                         string response = reader.ReadLine();
+                        if (!string.Equals(request, response))
+                        {
+                            Console.WriteLine("Inconsistent reply detected");
+                        }
+			writer.WriteLine(request);
+                        writer.Flush();
+			Logger.Tracing = true;
+                        response = reader.ReadLine();
                         if (!string.Equals(request, response))
                         {
                             Console.WriteLine("Inconsistent reply detected");

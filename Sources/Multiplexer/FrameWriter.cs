@@ -3,8 +3,6 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using System.Diagnostics;
-    using System.Text;
     using System.Threading;
 
     internal class FrameWriter : IFrameWriter
@@ -46,7 +44,7 @@
             {
                 // No write is in progress - let's write it out
                 List<List<WriteFrame>> writingRequests = new List<List<WriteFrame>> { frames };
-                ar = this.BeginWriteAllFrames(writingRequests, new WriteState(this));                
+                ar = this.BeginWriteAllFrames(writingRequests, new WriteState(this));
             }
             else
             {
@@ -86,7 +84,7 @@
             IAsyncResult ar = this.transportWriter.BeginWrite(writeState.WritingSegments, OnTransportWriteCompletedCallback, writeState);
             return ar;
         }
-        
+
         private bool ProcessBeginWriteAllFrameAsyncResult(IAsyncResult ar)
         {
             if (ar.CompletedSynchronously)

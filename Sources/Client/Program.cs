@@ -19,6 +19,8 @@
         {
             ThreadPool.QueueUserWorkItem(DumpLog);
             new Program().Run();
+            Logger.Dump();
+            Logger.Clean();
         }
 
         private static void DumpLog(object state)
@@ -48,19 +50,23 @@
         private void OnConnectCompleted()
         {
             this.connection = new Connection(this.client.Client);
-            this.requestCount = 2;
+            this.requestCount = 300;
+            Logger.MarkStart(DateTime.Now.Ticks);
             for (int i = 0; i < this.requestCount; i++)
             {
-	            ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run((int)state); }, i);
+                ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run((int)state); }, i);
             }
         }
 
         private void OnExecutionCompleted()
         {
-            if (Interlocked.Decrement(ref this.requestCount) == 0)
+            int decreased = Interlocked.Decrement(ref this.requestCount);
+            //Console.WriteLine(decreased);
+            if (decreased == 0)
             {
                 this.connection.BeginClose(OnConnectionClosed, this);
             }
+            
         }
 
         private static void OnConnectionClosed(IAsyncResult ar)
@@ -79,7 +85,6 @@
         {
             private Channel channel;
             private Program program;
-            private byte[] buffer = new byte[1];
 
             public Executor(Connection connection, Program program)
             {
@@ -101,16 +106,16 @@
                         {
                             Console.WriteLine("Inconsistent reply detected");
                         }
-			writer.WriteLine(request);
-                        writer.Flush();
-			Logger.Tracing = true;
-                        response = reader.ReadLine();
-                        if (!string.Equals(request, response))
-                        {
-                            Console.WriteLine("Inconsistent reply detected");
-                        }
+                        //writer.WriteLine(request);
+                        //writer.Flush();
+                        //response = reader.ReadLine();
+                        //if (!string.Equals(request, response))
+                        //{
+                        //    Console.WriteLine("Inconsistent reply detected");
+                        //}
                     }
                 }
+                Logger.MarkEnd(DateTime.Now.Ticks);
                 program.OnExecutionCompleted();
             }
         }

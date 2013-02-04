@@ -213,7 +213,8 @@
             m_result = result;
         }
 
-        protected AsyncResult(AsyncCallback asyncCallback, object state, object owner, string operationId) : base(asyncCallback, state, owner, operationId)
+        protected AsyncResult(AsyncCallback asyncCallback, object state, object owner, string operationId)
+            : base(asyncCallback, state, owner, operationId)
         {
         }
 

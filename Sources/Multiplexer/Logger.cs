@@ -11,9 +11,6 @@
 
         private static Dictionary<int, List<string>> logStatementsMap = new Dictionary<int, List<string>>();
         private static Dictionary<string, StringBuilder> logStreamMap = new Dictionary<string, StringBuilder>();
-        private static long start;
-        private static long end;
-        private static int count;
 
         public static void Log(string logStatement)
         {
@@ -29,17 +26,6 @@
                 }
             }
             logStatements.Add(Interlocked.Increment(ref sequenceNumber) + " " + logStatement);
-        }
-
-        public static void MarkStart(long start)
-        {
-            Interlocked.Exchange(ref Logger.start, start);
-        }
-
-        public static void MarkEnd(long end)
-        {
-            Interlocked.Exchange(ref Logger.end, end);
-            Interlocked.Increment(ref Logger.count);
         }
 
         public static void LogStream(string streamName, IEnumerable<byte> streamData)
@@ -76,9 +62,6 @@
 
         public static void Dump()
         {
-            Console.WriteLine(count);
-            Console.WriteLine(start);
-            Console.WriteLine(end);
             //foreach (var thread in logStatementsMap)
             //{
             //    Console.WriteLine("Thread " + thread.Key);

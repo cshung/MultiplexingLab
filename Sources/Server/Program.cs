@@ -27,21 +27,13 @@
             listener.BeginAcceptTcpClient(OnAccept, this);
             Console.WriteLine("[Server] Listening");
             Console.WriteLine("Press any key to stop");
-            while (true)
-            {
-                Console.ReadLine();
-                Console.Clear();
-                Logger.Dump();
-                Logger.Clean();
-            }
+            Console.ReadLine();
         }
 
         private static void OnAccept(IAsyncResult ar)
         {
             Program thisPtr = (Program)ar.AsyncState;
             TcpClient client = thisPtr.listener.EndAcceptTcpClient(ar);
-            Logger.Dump();
-            Logger.Clean();
             thisPtr.OnAccept(client);
         }
 
@@ -131,14 +123,14 @@
     public class ChannelHandler
     {
         private static Random random = new Random();
-        private Guid identity;
+        private Channel channel;
         private StreamReader reader;
         private StreamWriter writer;
         private Timer timer;
 
         public ChannelHandler(Channel channel)
         {
-            this.identity = Guid.NewGuid();
+            this.channel = channel;
             this.reader = new StreamReader(channel);
             this.writer = new StreamWriter(channel);
             this.HandleStream();
@@ -146,7 +138,7 @@
 
         private void HandleStream()
         {
-            reader.ReadLineAsync().ContinueWith(OnReadLineCallback);
+            this.reader.ReadLineAsync().ContinueWith(OnReadLineCallback);
         }
 
         private void OnReadLineCallback(Task<string> task)
@@ -165,14 +157,15 @@
         private void OnWriteLineCallback(Task task)
         {
             task.Wait();
-            writer.FlushAsync().ContinueWith(OnFlushCallback);
+            this.writer.FlushAsync().ContinueWith(OnFlushCallback);
         }
 
         private void OnFlushCallback(Task t)
         {
             t.Wait();
-            writer.Dispose();
-            reader.Dispose();
+            this.writer.Dispose();
+            this.reader.Dispose();
+            this.channel.Close();
         }
     }
 }

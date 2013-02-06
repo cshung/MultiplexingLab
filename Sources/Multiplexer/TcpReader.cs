@@ -14,26 +14,12 @@
 
         public IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
         {
-            try
-            {
-                return socket.BeginReceive(buffer, offset, count, SocketFlags.None, callback, state);
-            }
-            catch
-            {
-                return null;
-            }
+            return socket.BeginReceive(buffer, offset, count, SocketFlags.None, callback, state);
         }
 
         public int EndRead(IAsyncResult ar)
         {
-            try
-            {
-                return socket.EndReceive(ar);
-            }
-            catch
-            {
-                return 0;
-            }
+            return socket.EndReceive(ar);
         }
 
         public void Close()

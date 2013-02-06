@@ -25,10 +25,6 @@
 
         internal IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
         {
-            if (this.readRequest != null)
-            {
-                Logger.Log("Multiple pending read request detected!");
-            }
             ReadAsyncResult currentResult = new ReadAsyncResult(this, buffer, offset, count, callback, state);
             bool shouldComplete = false;
             lock (fillLock)

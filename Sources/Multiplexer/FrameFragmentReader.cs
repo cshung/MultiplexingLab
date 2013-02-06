@@ -9,6 +9,7 @@
     internal class FrameFragmentReader : IFrameFragmentReader
     {
         private ITransportReader transportReader;
+        private Connection connection;
         private byte[] buffer;
 
         // These fields could be accessed by multiple threads at the same time using Interlocked.
@@ -40,8 +41,9 @@
             public List<byte> LastIncompleteHeader { get; set; }
         }
 
-        internal FrameFragmentReader(ITransportReader transportReader)
+        internal FrameFragmentReader(Connection connection, ITransportReader transportReader)
         {
+            this.connection = connection;
             this.transportReader = transportReader;
             this.buffer = new byte[Constants.DecodingBufferSize];
             this.receivers = new ConcurrentDictionary<int, Receiver>();
@@ -93,7 +95,7 @@
 
         private void BeginFillBuffer(int bufferStart)
         {
-            if (!shouldClose)
+            if (!this.shouldClose)
             {
                 IAsyncResult ar = this.transportReader.BeginRead(buffer, bufferStart, this.buffer.Length - bufferStart, OnTransportReadCallback, new ReadState { ThisPtr = this, BufferStart = bufferStart });
                 if (ar.CompletedSynchronously)
@@ -104,7 +106,7 @@
             }
             else
             {
-                this.transportReader.Close();
+                this.connection.OnCloseReceived();
             }
         }
 

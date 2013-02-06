@@ -41,6 +41,7 @@
   <ItemGroup>
     <Compile Include="AcceptAsyncResult.cs" />
     <Compile Include="AsyncResult.cs" />
+    <Compile Include="CloseAsyncResult.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="Constants.cs" />
     <Compile Include="FrameFragmentReader.cs" />

@@ -17,20 +17,7 @@
 
         private static void Main(string[] args)
         {
-            ThreadPool.QueueUserWorkItem(DumpLog);
             new Program().Run();
-            Logger.Dump();
-            Logger.Clean();
-        }
-
-        private static void DumpLog(object state)
-        {
-            while (true)
-            {
-                Console.ReadLine();
-                Logger.Dump();
-                Logger.Clean();
-            }
         }
 
         private void Run()
@@ -50,8 +37,7 @@
         private void OnConnectCompleted()
         {
             this.connection = new Connection(this.client.Client);
-            this.requestCount = 300;
-            Logger.MarkStart(DateTime.Now.Ticks);
+            this.requestCount = 30;
             for (int i = 0; i < this.requestCount; i++)
             {
                 ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run((int)state); }, i);
@@ -61,7 +47,6 @@
         private void OnExecutionCompleted()
         {
             int decreased = Interlocked.Decrement(ref this.requestCount);
-            //Console.WriteLine(decreased);
             if (decreased == 0)
             {
                 this.connection.BeginClose(OnConnectionClosed, this);
@@ -102,7 +87,11 @@
                         writer.WriteLine(request);
                         writer.Flush();
                         string response = reader.ReadLine();
-                        if (!string.Equals(request, response))
+                        if (string.Equals(request, response))
+                        {
+                            Console.WriteLine("Completed request");
+                        }
+                        else
                         {
                             Console.WriteLine("Inconsistent reply detected");
                         }
@@ -115,7 +104,7 @@
                         //}
                     }
                 }
-                Logger.MarkEnd(DateTime.Now.Ticks);
+
                 program.OnExecutionCompleted();
             }
         }

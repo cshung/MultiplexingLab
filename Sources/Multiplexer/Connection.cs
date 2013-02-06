@@ -13,13 +13,14 @@
 
         private FrameWriter frameWriter;
         private FrameFragmentReader frameFragmentReader;
+        private CloseAsyncResult pendingCloseRequest;
 
         public Connection(Socket socket)
         {
             this.socket = socket;
             this.channels = new ConcurrentDictionary<int, Channel>();
             this.frameWriter = new FrameWriter(new TcpWriter(socket));
-            this.frameFragmentReader = new FrameFragmentReader(new TcpReader(socket));
+            this.frameFragmentReader = new FrameFragmentReader(this, new TcpReader(socket));
         }
 
         public Channel CreateChannel()
@@ -45,13 +46,43 @@
 
         public IAsyncResult BeginClose(AsyncCallback callback, object state)
         {
-            return this.frameWriter.BeginClose(callback, state);
+            this.pendingCloseRequest = new CloseAsyncResult(callback, state, this);
+            this.BeginCloseSender(null, null);
+            return this.pendingCloseRequest;
         }
 
         public void EndClose(IAsyncResult ar)
         {
+            AsyncResult.End(ar, this, "Close");
+        }
+
+        internal void OnCloseReceived()
+        {
+            if (this.pendingCloseRequest == null)
+            {
+                this.BeginCloseSender(OnSenderClosedCallback, this);
+            }
+            else
+            {
+                this.socket.Close();
+                this.pendingCloseRequest.Complete();
+            }
+        }
+
+        private IAsyncResult BeginCloseSender(AsyncCallback callback, object state)
+        {
+            return this.frameWriter.BeginClose(callback, state);
+        }
+
+        private void EndCloseSender(IAsyncResult ar)
+        {
             this.frameWriter.EndClose(ar);
-            this.socket.Close();
+        }
+
+        private static void OnSenderClosedCallback(IAsyncResult ar)
+        {
+            Connection thisPtr = (Connection)ar.AsyncState;
+            thisPtr.socket.Close();
         }
     }
 }

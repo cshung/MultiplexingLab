@@ -17,6 +17,7 @@
 
         private static void Main(string[] args)
         {
+            ThreadPool.QueueUserWorkItem((o) => { Console.ReadLine(); Logger.Dump(); });
             new Program().Run();
         }
 
@@ -25,6 +26,7 @@
             this.client = new TcpClient();
             this.client.BeginConnect(IPAddress.Loopback, Constants.ServerPort, OnConnectCompleted, this);
             terminationLock.WaitOne();
+            Console.WriteLine("Done!");
         }
 
         private static void OnConnectCompleted(IAsyncResult ar)
@@ -37,7 +39,7 @@
         private void OnConnectCompleted()
         {
             this.connection = new Connection(this.client.Client);
-            this.requestCount = 30;
+            this.requestCount = 1;
             for (int i = 0; i < this.requestCount; i++)
             {
                 ThreadPool.QueueUserWorkItem((state) => { new Executor(connection, this).Run((int)state); }, i);
@@ -83,17 +85,20 @@
                 {
                     using (StreamReader reader = new StreamReader(this.channel))
                     {
-                        string request = "Sending over " + value + " to server";
-                        writer.WriteLine(request);
-                        writer.Flush();
-                        string response = reader.ReadLine();
-                        if (string.Equals(request, response))
+                        for (int i = 0; i < 500; i++)
                         {
-                            Console.WriteLine("Completed request");
-                        }
-                        else
-                        {
-                            Console.WriteLine("Inconsistent reply detected");
+                            string request = "Sending over " + value + " to server";
+                            writer.WriteLine(request);
+                            writer.Flush();
+                            string response = reader.ReadLine();
+                            if (string.Equals(request, response))
+                            {
+                                Console.WriteLine("Completed request");
+                            }
+                            else
+                            {
+                                Console.WriteLine("Inconsistent reply detected");
+                            }
                         }
                         //writer.WriteLine(request);
                         //writer.Flush();

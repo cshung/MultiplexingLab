@@ -17,6 +17,7 @@
 
         private static void Main(string[] args)
         {
+            ThreadPool.QueueUserWorkItem((o) => { Console.ReadLine(); Logger.Dump(); });
             new Program().Run();
         }
 
@@ -27,7 +28,12 @@
             listener.BeginAcceptTcpClient(OnAccept, this);
             Console.WriteLine("[Server] Listening");
             Console.WriteLine("Press any key to stop");
-            Console.ReadLine();
+            // Lock it
+            object thisLock = new object();
+            lock (thisLock)
+            {
+                Monitor.Wait(thisLock);
+            }
         }
 
         private static void OnAccept(IAsyncResult ar)
@@ -124,48 +130,36 @@
     {
         private static Random random = new Random();
         private Channel channel;
-        private StreamReader reader;
-        private StreamWriter writer;
-        private Timer timer;
 
         public ChannelHandler(Channel channel)
         {
             this.channel = channel;
-            this.reader = new StreamReader(channel);
-            this.writer = new StreamWriter(channel);
-            this.HandleStream();
+
+            ThreadPool.QueueUserWorkItem(HandleStreamCallback, this);
+            //this.HandleStream();
+        }
+
+        private void HandleStreamCallback(object state)
+        {
+            ChannelHandler thisPtr = (ChannelHandler)state;
+            thisPtr.HandleStream();
+
+            //this.reader.ReadLineAsync().ContinueWith(OnReadLineCallback);
         }
 
         private void HandleStream()
         {
-            this.reader.ReadLineAsync().ContinueWith(OnReadLineCallback);
-        }
-
-        private void OnReadLineCallback(Task<string> task)
-        {
-            string line = task.Result;
-            this.timer = new Timer(OnTimeUp, line, random.Next(5, 200), Timeout.Infinite);
-        }
-
-        private void OnTimeUp(object state)
-        {
-            this.timer = null;
-            string line = (string)state;
-            this.writer.WriteLineAsync(line).ContinueWith(OnWriteLineCallback);
-        }
-
-        private void OnWriteLineCallback(Task task)
-        {
-            task.Wait();
-            this.writer.FlushAsync().ContinueWith(OnFlushCallback);
-        }
-
-        private void OnFlushCallback(Task t)
-        {
-            t.Wait();
-            this.writer.Dispose();
-            this.reader.Dispose();
-            this.channel.Close();
+            using (StreamReader reader = new StreamReader(this.channel))
+            {
+                using (StreamWriter writer = new StreamWriter(this.channel))
+                {
+                    for (int i = 0; i < 500; i++)
+                    {
+                        writer.WriteLine(reader.ReadLine());
+                        writer.Flush();
+                    }
+                }
+            }
         }
     }
 }

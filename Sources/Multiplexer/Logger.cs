@@ -62,20 +62,20 @@
 
         public static void Dump()
         {
-            //foreach (var thread in logStatementsMap)
-            //{
-            //    Console.WriteLine("Thread " + thread.Key);
-            //    foreach (string line in thread.Value)
-            //    {
-            //        Console.WriteLine(line);
-            //    }
-            //    Console.WriteLine();
-            //}
+            foreach (var thread in logStatementsMap)
+            {
+                Console.WriteLine("Thread " + thread.Key);
+                foreach (string line in thread.Value)
+                {
+                    Console.WriteLine(line);
+                }
+                Console.WriteLine();
+            }
 
-            //foreach (var stream in logStreamMap)
-            //{
-            //    Console.WriteLine(stream.Key + ": " + stream.Value.ToString());
-            //}
+            foreach (var stream in logStreamMap)
+            {
+                Console.WriteLine(stream.Key + ": " + stream.Value.ToString());
+            }
         }
     }
 }

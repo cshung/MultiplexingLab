@@ -4,10 +4,10 @@
     using System.IO;
     using System.Net;
     using System.Net.Sockets;
-    using Common;
-    using Connector;
     using System.Threading;
     using System.Threading.Tasks;
+    using Common;
+    using Connector;
 
     internal class Program
     {
@@ -31,28 +31,6 @@
         {
             Program thisPtr = (Program)ar.AsyncState;
             thisPtr.OnAcceptChannel(thisPtr.connection.EndAcceptChannel(ar));
-        }
-
-        private void Run()
-        {
-            this.listener = new TcpListener(IPAddress.Any, Constants.Port);
-            this.listener.Start();
-            this.listener.BeginAcceptTcpClient(OnAcceptCallback, this);
-        }
-
-        private void OnAccept(TcpClient client)
-        {
-            this.connection = new Connection(client.Client, ConnectionType.Server);
-            this.connection.BeginAcceptChannel(OnAcceptChannelCallback, this);
-        }
-
-        // TODO: Be careful with async callback - they can't be blocked - or actor will block.
-        private void OnAcceptChannel(Channel channel)
-        {
-            this.connection.BeginAcceptChannel(OnAcceptChannelCallback, this);
-            ThreadPool.QueueUserWorkItem(async (state) => { await WorkAsync(channel); });
-            // Accept more connections
-            this.listener.BeginAcceptTcpClient(OnAcceptCallback, this);
         }
 
         private static async Task WorkAsync(Channel channel)
@@ -83,6 +61,28 @@
                     }
                 }
             }
+        }
+
+        private void Run()
+        {
+            this.listener = new TcpListener(IPAddress.Any, Constants.Port);
+            this.listener.Start();
+            this.listener.BeginAcceptTcpClient(OnAcceptCallback, this);
+        }
+
+        private void OnAccept(TcpClient client)
+        {
+            // Accept more connections
+            this.listener.BeginAcceptTcpClient(OnAcceptCallback, this);
+            this.connection = new Connection(client.Client, ConnectionType.Server);
+            this.connection.BeginAcceptChannel(OnAcceptChannelCallback, this);
+        }
+
+        // TODO: Be careful with async callback - they can't be blocked - or actor will block.
+        private void OnAcceptChannel(Channel channel)
+        {
+            this.connection.BeginAcceptChannel(OnAcceptChannelCallback, this);
+            ThreadPool.QueueUserWorkItem(async (state) => { await WorkAsync(channel); });            
         }
     }
 }

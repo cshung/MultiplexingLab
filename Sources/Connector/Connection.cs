@@ -4,8 +4,8 @@
     using System.Collections.Generic;
     using System.Linq;
     using System.Net.Sockets;
+    using System.Threading.Tasks;
     using Actor;
-using System.Threading.Tasks;
 
     public class Connection
     {
@@ -72,7 +72,7 @@ using System.Threading.Tasks;
 
         public Task KeepAliveAsync()
         {
-            return new TaskFactory().FromAsync(BeginKeepAlive, EndKeepAlive, null);
+            return new TaskFactory().FromAsync(this.BeginKeepAlive, this.EndKeepAlive, null);
         }
 
         public IAsyncResult BeginKeepAlive(AsyncCallback callback, object state)

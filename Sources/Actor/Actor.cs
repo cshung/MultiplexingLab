@@ -62,12 +62,9 @@
             this.actorManager.SendMessage(to, message);
         }
 
-        private int threadId;
-
         private void Work(object state)
         {
             this.state = ActorState.Running;
-            this.threadId = Thread.CurrentThread.ManagedThreadId;
             ActorContinuation actorContinuation = ActorContinuation.Done;
             do
             {

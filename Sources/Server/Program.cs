@@ -1,162 +1,85 @@
-﻿namespace Multiplexing
+﻿namespace Server
 {
-    using Common;
-    using Multiplexer;
     using System;
-    using System.Collections.Generic;
     using System.IO;
     using System.Net;
     using System.Net.Sockets;
+    using Common;
+    using Connector;
     using System.Threading;
     using System.Threading.Tasks;
 
     internal class Program
     {
         private TcpListener listener;
-        private List<ConnectionHandler> connectionHandlers = new List<ConnectionHandler>();
+        private Connection connection;
 
         private static void Main(string[] args)
         {
-            ThreadPool.QueueUserWorkItem((o) => { Console.ReadLine(); Logger.Dump(); });
-            new Program().Run();
+            Program program = new Program();
+            program.Run();
+            Console.ReadLine();
+        }
+
+        private static void OnAcceptCallback(IAsyncResult ar)
+        {
+            Program thisPtr = (Program)ar.AsyncState;
+            thisPtr.OnAccept(thisPtr.listener.EndAcceptTcpClient(ar));
+        }
+
+        private static void OnAcceptChannelCallback(IAsyncResult ar)
+        {
+            Program thisPtr = (Program)ar.AsyncState;
+            thisPtr.OnAcceptChannel(thisPtr.connection.EndAcceptChannel(ar));
         }
 
         private void Run()
         {
-            this.listener = new TcpListener(IPAddress.Any, Constants.ServerPort);
+            this.listener = new TcpListener(IPAddress.Any, Constants.Port);
             this.listener.Start();
-            listener.BeginAcceptTcpClient(OnAccept, this);
-            Console.WriteLine("[Server] Listening");
-            Console.WriteLine("Press any key to stop");
-            // Lock it
-            object thisLock = new object();
-            lock (thisLock)
-            {
-                Monitor.Wait(thisLock);
-            }
-        }
-
-        private static void OnAccept(IAsyncResult ar)
-        {
-            Program thisPtr = (Program)ar.AsyncState;
-            TcpClient client = thisPtr.listener.EndAcceptTcpClient(ar);
-            thisPtr.OnAccept(client);
+            this.listener.BeginAcceptTcpClient(OnAcceptCallback, this);
         }
 
         private void OnAccept(TcpClient client)
         {
-            Logger.Log("[Server] Accepting TCP connection");
-            this.listener.BeginAcceptTcpClient(OnAccept, this);
-            this.connectionHandlers.Add(new ConnectionHandler(client));
-            //new DebuggingConnectionHandler(client);
-        }
-    }
-
-    #region Debugger
-    internal class DebuggingConnectionHandler
-    {
-        private NetworkStream stream;
-        private byte[] buffer = new byte[10];
-        private int lineNumber;
-
-        public DebuggingConnectionHandler(TcpClient client)
-        {
-            this.stream = client.GetStream();
-            this.Next();
+            this.connection = new Connection(client.Client, ConnectionType.Server);
+            this.connection.BeginAcceptChannel(OnAcceptChannelCallback, this);
         }
 
-        private void Next()
+        // TODO: Be careful with async callback - they can't be blocked - or actor will block.
+        private void OnAcceptChannel(Channel channel)
         {
-            this.stream.BeginRead(buffer, 0, 10, OnRead, this);
+            this.connection.BeginAcceptChannel(OnAcceptChannelCallback, this);
+            ThreadPool.QueueUserWorkItem(async (state) => { await WorkAsync(channel); });
+            // Accept more connections
+            this.listener.BeginAcceptTcpClient(OnAcceptCallback, this);
         }
 
-        private static void OnRead(IAsyncResult ar)
+        private static async Task WorkAsync(Channel channel)
         {
-            DebuggingConnectionHandler thisPtr = (DebuggingConnectionHandler)ar.AsyncState;
-            try
+            using (channel)
             {
-                int byteRead = thisPtr.stream.EndRead(ar);
-                thisPtr.OnRead(byteRead);
-            }
-            catch
-            {
-                // Game over on this 'client', but no big deal for the rest
-            }
-
-        }
-
-        private void OnRead(int byteRead)
-        {
-            if (byteRead != 0)
-            {
-                for (int i = 0; i < byteRead; i++)
+                using (var reader = new StreamReader(channel))
                 {
-                    Console.WriteLine("{0}\t{1}", ++this.lineNumber, this.buffer[i]);
-                }
-
-                this.Next();
-            }
-        }
-    }
-    #endregion
-
-    public class ConnectionHandler
-    {
-        private Connection connection;
-        private List<ChannelHandler> channelHandlers = new List<ChannelHandler>();
-
-        public ConnectionHandler(TcpClient client)
-        {
-            this.connection = new Connection(client.Client);
-            this.connection.BeginAccept(OnAcceptedCallback, this);
-        }
-
-        private static void OnAcceptedCallback(IAsyncResult ar)
-        {
-            Logger.Log("[Server] Accepting Channel");
-            ConnectionHandler thisPtr = (ConnectionHandler)ar.AsyncState;
-            Channel stream = thisPtr.connection.EndAccept(ar);
-            thisPtr.OnAccepted(stream);
-        }
-
-        private void OnAccepted(Channel stream)
-        {
-            this.connection.BeginAccept(OnAcceptedCallback, this);
-            this.channelHandlers.Add(new ChannelHandler(stream));
-        }
-    }
-
-    public class ChannelHandler
-    {
-        private static Random random = new Random();
-        private Channel channel;
-
-        public ChannelHandler(Channel channel)
-        {
-            this.channel = channel;
-
-            ThreadPool.QueueUserWorkItem(HandleStreamCallback, this);
-            //this.HandleStream();
-        }
-
-        private void HandleStreamCallback(object state)
-        {
-            ChannelHandler thisPtr = (ChannelHandler)state;
-            thisPtr.HandleStream();
-
-            //this.reader.ReadLineAsync().ContinueWith(OnReadLineCallback);
-        }
-
-        private void HandleStream()
-        {
-            using (StreamReader reader = new StreamReader(this.channel))
-            {
-                using (StreamWriter writer = new StreamWriter(this.channel))
-                {
-                    for (int i = 0; i < 500; i++)
+                    using (var writer = new StreamWriter(channel))
                     {
-                        writer.WriteLine(reader.ReadLine());
-                        writer.Flush();
+                        string request = await reader.ReadLineAsync();
+                        await writer.WriteLineAsync(request);
+                        await writer.FlushAsync();
+
+                        request = await reader.ReadLineAsync();
+                        await writer.WriteLineAsync(request);
+                        await writer.FlushAsync();
+
+                        Console.WriteLine("Server waiting for close");
+
+                        if (reader.EndOfStream)
+                        {
+                            Console.WriteLine("Server feel right!");
+                        }
+
+                        await channel.StopSendingAsync();
+                        await channel.FlushAsync();
                     }
                 }
             }

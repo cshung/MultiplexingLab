@@ -2,6 +2,6 @@
 {
     public static class Constants
     {
-        public static int ServerPort = 10086;
+        public const int Port = 10086;
     }
 }

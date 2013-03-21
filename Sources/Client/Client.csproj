@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{779E9B03-0CC5-499E-9D61-48213E58844F}</ProjectGuid>
+    <ProjectGuid>{3D2F6BD5-CC58-4810-877D-AA6E8414D09B}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Client</RootNamespace>
@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\Binaries\Debug</OutputPath>
+    <OutputPath>..\..\Binaries\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -26,7 +26,7 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>..\..\Binaries\Debug\Release</OutputPath>
+    <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -49,12 +49,12 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{72b8edee-e490-4106-9e1f-adbb92e5827b}</Project>
+      <Project>{450f5e5f-d78c-4918-a1b2-5377bbffb4fb}</Project>
       <Name>Common</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Multiplexer\Multiplexer.csproj">
-      <Project>{fca84a4f-416d-40a4-b72c-3dad6238a2da}</Project>
-      <Name>Multiplexer</Name>
+    <ProjectReference Include="..\Connector\Connector.csproj">
+      <Project>{3536f678-fa69-4741-aef3-37d5eef3c565}</Project>
+      <Name>Connector</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

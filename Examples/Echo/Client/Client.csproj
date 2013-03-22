@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\Binaries\Debug\</OutputPath>
+    <OutputPath>..\..\..\Binaries\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -32,6 +32,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Connector">
+      <HintPath>..\..\..\Binaries\Debug\Connector.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -51,10 +54,6 @@
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{450f5e5f-d78c-4918-a1b2-5377bbffb4fb}</Project>
       <Name>Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Connector\Connector.csproj">
-      <Project>{3536f678-fa69-4741-aef3-37d5eef3c565}</Project>
-      <Name>Connector</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

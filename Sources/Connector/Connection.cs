@@ -592,7 +592,7 @@
                 }
                 else
                 {
-                    Console.WriteLine("Got KeepAlive!");
+                    // Got a KeepAlive request - safe to ignore
                 }
             }
 

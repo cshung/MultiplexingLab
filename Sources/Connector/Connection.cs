@@ -701,6 +701,8 @@
                         this.readRequest = null;
                         completionHandle.NotifyCompleted(copiedCount);
                     }
+
+                    // TODO: Here is when a channel is closed by the other side 
                 }
             }
 

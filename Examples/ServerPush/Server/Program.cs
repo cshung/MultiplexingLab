@@ -52,9 +52,12 @@
                     {
                         await writer.WriteLineAsync("Server is pushing");
                         await writer.FlushAsync();
-                        Console.WriteLine("Server got response!" + await reader.ReadLineAsync());
-                        await writer.WriteLineAsync("Go away");
-                        await writer.FlushAsync();
+                        Console.WriteLine(await reader.ReadLineAsync());
+                        await channel.StopSendingAsync();
+                        if (reader.EndOfStream)
+                        {
+                            Console.WriteLine("Server feel right!");
+                        }
                     }
                 }
             }

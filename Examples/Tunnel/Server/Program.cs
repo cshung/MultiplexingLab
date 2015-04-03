@@ -1,19 +1,23 @@
 ﻿namespace Server
 {
+    using Connector;
     using System;
+    using System.Configuration;
     using System.IO;
     using System.Net;
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
-    using Common;
-    using Connector;
 
     internal class Program
     {
         private TcpListener tunnelListener;
         private TcpListener clientListener;
         private Connection connection;
+
+        // Configuration values
+        private int tunnelPort;
+        private int clientPort;
 
         private static void Main(string[] args)
         {
@@ -36,9 +40,41 @@
 
         private void Run()
         {
-            this.tunnelListener = new TcpListener(IPAddress.Any, Constants.TunnelPort);
+            if (!this.ReadConfiguration())
+            {
+                Console.WriteLine("Configuration file error - please fix your configuration file.");
+                return;
+            }
+
+            this.tunnelListener = new TcpListener(IPAddress.Any, this.tunnelPort);
             this.tunnelListener.Start();
             this.tunnelListener.BeginAcceptTcpClient(OnAcceptTunnelCallback, this);
+        }
+
+        private bool ReadConfiguration()
+        {
+            string tunnelPortString = ConfigurationManager.AppSettings["tunnelPort"];
+            if (string.IsNullOrEmpty(tunnelPortString))
+            {
+                return false;
+            }
+
+            if (!int.TryParse(tunnelPortString, out this.tunnelPort))
+            {
+                return false;
+            }
+
+            string clientPortString = ConfigurationManager.AppSettings["clientPort"];
+            if (string.IsNullOrEmpty(clientPortString))
+            {
+                return false;
+            }
+
+            if (!int.TryParse(clientPortString, out this.clientPort))
+            {
+                return false;
+            }
+            return true;
         }
 
         private void OnAcceptTunnel(TcpClient tunnel)
@@ -48,7 +84,7 @@
 
             this.connection = new Connection(tunnel.Client, ConnectionType.Server);
 
-            this.clientListener = new TcpListener(IPAddress.Any, 12580);
+            this.clientListener = new TcpListener(IPAddress.Any, this.clientPort);
             this.clientListener.Start();
             this.clientListener.BeginAcceptTcpClient(OnAcceptClientCallback, this);
         }
@@ -62,10 +98,12 @@
 
         private void WorkAsync(TcpClient client)
         {
+            Console.WriteLine("Obtained client connection:");
             using (client)
             {
                 using (Channel tunnelChannel = this.connection.ConnectChannel())
                 {
+                    Console.WriteLine("  Start Tunnelling");
                     using (Stream clientChannel = client.GetStream())
                     {
                         // Server
@@ -73,6 +111,7 @@
                         Task forwardTunnelWriteTask = tunnelChannel.CopyToAsync(clientChannel).ContinueWith((t) => { client.Client.Shutdown(SocketShutdown.Send); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
                         Task.WaitAll(forwardClientWriteTask, forwardTunnelWriteTask);
                     }
+                    Console.WriteLine("  Done Tunnelling");
                 }
             }
         }

@@ -1,13 +1,12 @@
 ﻿namespace Client
 {
+    using Connector;
     using System;
-    using System.IO;
+    using System.Configuration;
     using System.Net;
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
-    using Common;
-    using Connector;
 
     internal class Program
     {
@@ -15,6 +14,11 @@
         private TcpClient client;
         private Connection connection;
         private Timer keepAliveTimer;
+
+        // Configuration values
+        private int tunnelPort;
+        private string serverName;
+        private int serverPort;
 
         private static void Main(string[] args)
         {
@@ -39,12 +43,48 @@
 
         private void Run()
         {
+            if (!this.ReadConfiguration())
+            {
+                Console.WriteLine("Configuration file error - please fix your configuration file.");
+                return;
+            }
+
             this.client = new TcpClient();
-            this.client.BeginConnect(IPAddress.Loopback, Constants.TunnelPort, OnConnectCompletedCallback, this);
+            this.client.BeginConnect(IPAddress.Loopback, this.tunnelPort, OnConnectCompletedCallback, this);
+        }
+
+        private bool ReadConfiguration()
+        {
+            string tunnelPortString = ConfigurationManager.AppSettings["tunnelPort"];
+            if (string.IsNullOrEmpty(tunnelPortString))
+            {
+                return false;
+            }
+
+            if (!int.TryParse(tunnelPortString, out this.tunnelPort))
+            {
+                return false;
+            }
+
+            string serverPortString = ConfigurationManager.AppSettings["serverPort"];
+            if (string.IsNullOrEmpty(serverPortString))
+            {
+                return false;
+            }
+
+            if (!int.TryParse(serverPortString, out this.serverPort))
+            {
+                return false;
+            }
+
+            this.serverName = ConfigurationManager.AppSettings["serverName"];
+            
+            return true;
         }
 
         private void OnConnectCompleted()
         {
+            Console.WriteLine("Connected to tunnel");
             this.connection = new Connection(this.client.Client, ConnectionType.Client);
             this.keepAliveTimer = new Timer(this.KeepAlive);
             this.keepAliveTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(1));
@@ -65,16 +105,19 @@
 
         private async Task WorkAsync(Channel tunnelChannel)
         {
+            Console.WriteLine("Obtained tunnel connection");
             using (tunnelChannel)
             {
                 TcpClient remoteClient = new TcpClient();
-                await remoteClient.ConnectAsync("localhost", 8080);
+                await remoteClient.ConnectAsync(this.serverName, this.serverPort);
                 using (var remoteChannel = remoteClient.GetStream())
                 {
+                    Console.WriteLine("Begin Going to server connection");
                     // Client
                     Task forwardRemoteWriteTask = remoteChannel.CopyToAsync(tunnelChannel).ContinueWith((t) => { tunnelChannel.StopSendingAsync(); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
                     Task forwardTunnelWriteTask = tunnelChannel.CopyToAsync(remoteChannel).ContinueWith((t) => { remoteClient.Client.Shutdown(SocketShutdown.Send); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
                     Task.WaitAll(forwardRemoteWriteTask, forwardTunnelWriteTask);
+                    Console.WriteLine("Done Going to server connection");
                 }
             }
         }

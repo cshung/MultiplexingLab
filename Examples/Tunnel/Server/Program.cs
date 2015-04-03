@@ -98,12 +98,10 @@
 
         private void WorkAsync(TcpClient client)
         {
-            Console.WriteLine("Obtained client connection:");
             using (client)
             {
                 using (Channel tunnelChannel = this.connection.ConnectChannel())
                 {
-                    Console.WriteLine("  Start Tunnelling");
                     using (Stream clientChannel = client.GetStream())
                     {
                         // Server
@@ -111,7 +109,6 @@
                         Task forwardTunnelWriteTask = tunnelChannel.CopyToAsync(clientChannel).ContinueWith((t) => { client.Client.Shutdown(SocketShutdown.Send); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
                         Task.WaitAll(forwardClientWriteTask, forwardTunnelWriteTask);
                     }
-                    Console.WriteLine("  Done Tunnelling");
                 }
             }
         }

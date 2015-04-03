@@ -84,7 +84,6 @@
 
         private void OnConnectCompleted()
         {
-            Console.WriteLine("Connected to tunnel");
             this.connection = new Connection(this.client.Client, ConnectionType.Client);
             this.keepAliveTimer = new Timer(this.KeepAlive);
             this.keepAliveTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(1));
@@ -105,19 +104,16 @@
 
         private async Task WorkAsync(Channel tunnelChannel)
         {
-            Console.WriteLine("Obtained tunnel connection");
             using (tunnelChannel)
             {
                 TcpClient remoteClient = new TcpClient();
                 await remoteClient.ConnectAsync(this.serverName, this.serverPort);
                 using (var remoteChannel = remoteClient.GetStream())
                 {
-                    Console.WriteLine("Begin Going to server connection");
                     // Client
                     Task forwardRemoteWriteTask = remoteChannel.CopyToAsync(tunnelChannel).ContinueWith((t) => { tunnelChannel.StopSendingAsync(); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
                     Task forwardTunnelWriteTask = tunnelChannel.CopyToAsync(remoteChannel).ContinueWith((t) => { remoteClient.Client.Shutdown(SocketShutdown.Send); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
                     Task.WaitAll(forwardRemoteWriteTask, forwardTunnelWriteTask);
-                    Console.WriteLine("Done Going to server connection");
                 }
             }
         }

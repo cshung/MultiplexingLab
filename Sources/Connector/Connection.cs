@@ -47,6 +47,7 @@
                 result = new Channel(this, this.nextChannelId);
                 this.channels.Add(this.nextChannelId, result);
                 this.actorManager.SendMessage(this.transportReceivingActor, new ChannelCreatedMessage(this.nextChannelId));
+                result.BeginStopSending(null, null);
                 this.nextChannelId += 2;
             }
 
@@ -613,12 +614,14 @@
             private TransportReceivingActor parent;
             private ReadRequestMessage readRequest;
             private Queue<SegmentWrapper> data;
+            private bool accepted;
 
             public ChannelReceivingActor(TransportReceivingActor parent, ActorManager actorManager)
                 : base(actorManager)
             {
                 this.parent = parent;
                 this.data = new Queue<SegmentWrapper>();
+                this.accepted = false;
             }
 
             public override ActorContinuation OnReceiveMessage(IMessage message)
@@ -679,7 +682,18 @@
                         SegmentWrapper firstSegmentWrapper = this.data.Peek();
                         ArraySegment<byte> firstSegment = firstSegmentWrapper.Segment;
                         int bytesToCopy = Math.Min(firstSegment.Count, spaceToFill);
-                        isEof = firstSegment.Count == 0;
+                        if (firstSegment.Count == 0)
+                        {
+                            if (this.accepted)
+                            {
+                                isEof = true;
+                            }
+                            else
+                            {
+                                this.accepted = true;
+                            }
+                        }
+
                         if (bytesToCopy == firstSegment.Count)
                         {
                             this.data.Dequeue();

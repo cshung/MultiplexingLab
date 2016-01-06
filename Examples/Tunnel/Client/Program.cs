@@ -16,6 +16,7 @@
         private Timer keepAliveTimer;
 
         // Configuration values
+        private string tunnelName;
         private int tunnelPort;
         private string serverName;
         private int serverPort;
@@ -50,7 +51,7 @@
             }
 
             this.client = new TcpClient();
-            this.client.BeginConnect(IPAddress.Loopback, this.tunnelPort, OnConnectCompletedCallback, this);
+            this.client.BeginConnect(this.tunnelName, this.tunnelPort, OnConnectCompletedCallback, this);
         }
 
         private bool ReadConfiguration()
@@ -77,6 +78,7 @@
                 return false;
             }
 
+            this.tunnelName = ConfigurationManager.AppSettings["tunnelName"];
             this.serverName = ConfigurationManager.AppSettings["serverName"];
             
             return true;

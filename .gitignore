@@ -1,3 +1,4 @@
-Binaries
+.vs
 *.suo
 obj/
+bin/

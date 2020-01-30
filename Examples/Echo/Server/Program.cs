@@ -1,4 +1,10 @@
-﻿namespace Server
+﻿//-----------------------------------------------------------------------
+// <copyright file="Program.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Server
 {
     using System;
     using System.IO;
@@ -82,7 +88,7 @@
         private void OnAcceptChannel(Channel channel)
         {
             this.connection.BeginAcceptChannel(OnAcceptChannelCallback, this);
-            ThreadPool.QueueUserWorkItem(async (state) => { await WorkAsync(channel); });            
+            ThreadPool.QueueUserWorkItem(async (state) => { await WorkAsync(channel); });
         }
     }
 }

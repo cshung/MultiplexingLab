@@ -1,4 +1,10 @@
-﻿namespace Connector
+﻿//-----------------------------------------------------------------------
+// <copyright file="AsyncResult.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Connector
 {
     using System;
     using System.Diagnostics;
@@ -6,7 +12,7 @@
 
     internal class AsyncResult : IAsyncResult
     {
-        // Defining what does it mean by the state 
+        // Defining what does it mean by the state
         private const int PendingState = 0;
         private const int CompletedSynchronouslyState = 1;
         private const int CompletedAsynchronouslyState = 2;
@@ -214,7 +220,7 @@
 
             Debug.Assert(asyncResult != null, "Should not happen");
 
-            // Wait until operation has completed 
+            // Wait until operation has completed
             AsyncResult.End(result, owner, operationId);
 
             // Return the result (if above didn't throw)

@@ -1,12 +1,18 @@
-﻿namespace Client
+﻿//-----------------------------------------------------------------------
+// <copyright file="Program.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Client
 {
-    using Connector;
     using System;
     using System.Configuration;
     using System.Net;
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
+    using Connector;
 
     internal class Program
     {
@@ -80,7 +86,7 @@
 
             this.tunnelName = ConfigurationManager.AppSettings["tunnelName"];
             this.serverName = ConfigurationManager.AppSettings["serverName"];
-            
+
             return true;
         }
 
@@ -113,8 +119,32 @@
                 using (var remoteChannel = remoteClient.GetStream())
                 {
                     // Client
-                    Task forwardRemoteWriteTask = remoteChannel.CopyToAsync(tunnelChannel).ContinueWith((t) => { tunnelChannel.StopSendingAsync(); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
-                    Task forwardTunnelWriteTask = tunnelChannel.CopyToAsync(remoteChannel).ContinueWith((t) => { remoteClient.Client.Shutdown(SocketShutdown.Send); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
+                    Task forwardRemoteWriteTask = remoteChannel.CopyToAsync(tunnelChannel).ContinueWith((t) =>
+                    {
+                        tunnelChannel.StopSendingAsync();
+                    }).ContinueWith((t) =>
+                    {
+                        try
+                        {
+                            t.Wait();
+                        }
+                        catch
+                        {
+                        }
+                    });
+                    Task forwardTunnelWriteTask = tunnelChannel.CopyToAsync(remoteChannel).ContinueWith((t) =>
+                    {
+                        remoteClient.Client.Shutdown(SocketShutdown.Send);
+                    }).ContinueWith((t) =>
+                    {
+                        try
+                        {
+                            t.Wait();
+                        }
+                        catch
+                        {
+                        }
+                    });
                     Task.WaitAll(forwardRemoteWriteTask, forwardTunnelWriteTask);
                 }
             }

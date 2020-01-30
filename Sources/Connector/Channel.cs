@@ -1,4 +1,10 @@
-﻿namespace Connector
+﻿//-----------------------------------------------------------------------
+// <copyright file="Channel.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Connector
 {
     using System;
     using System.IO;

@@ -1,13 +1,19 @@
-﻿namespace Client
+﻿//-----------------------------------------------------------------------
+// <copyright file="Program.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Client
 {
     using System;
     using System.IO;
     using System.Net;
     using System.Net.Sockets;
     using System.Threading;
+    using System.Threading.Tasks;
     using Common;
     using Connector;
-    using System.Threading.Tasks;
 
     internal class Program
     {
@@ -67,6 +73,7 @@
                         {
                             Console.WriteLine("Client feel right!");
                         }
+
                         await channel.StopSendingAsync();
                     }
                 }

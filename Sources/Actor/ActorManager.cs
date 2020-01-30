@@ -1,4 +1,10 @@
-﻿namespace Actor
+﻿//-----------------------------------------------------------------------
+// <copyright file="ActorManager.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Actor
 {
     using System.Collections.Generic;
     using System.Threading;

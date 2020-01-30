@@ -1,6 +1,11 @@
-﻿namespace Server
+﻿//-----------------------------------------------------------------------
+// <copyright file="Program.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Server
 {
-    using Connector;
     using System;
     using System.Configuration;
     using System.IO;
@@ -8,6 +13,7 @@
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
+    using Connector;
 
     internal class Program
     {
@@ -74,6 +80,7 @@
             {
                 return false;
             }
+
             return true;
         }
 
@@ -93,7 +100,7 @@
         {
             // Accept more client connections
             this.clientListener.BeginAcceptTcpClient(OnAcceptClientCallback, this);
-            ThreadPool.QueueUserWorkItem((state) => { WorkAsync(client); });
+            ThreadPool.QueueUserWorkItem((state) => { this.WorkAsync(client); });
         }
 
         private void WorkAsync(TcpClient client)
@@ -105,8 +112,32 @@
                     using (Stream clientChannel = client.GetStream())
                     {
                         // Server
-                        Task forwardClientWriteTask = clientChannel.CopyToAsync(tunnelChannel).ContinueWith((t) => { tunnelChannel.StopSendingAsync(); }).ContinueWith((t) => { try { t.Wait(); } catch { } }); ;
-                        Task forwardTunnelWriteTask = tunnelChannel.CopyToAsync(clientChannel).ContinueWith((t) => { client.Client.Shutdown(SocketShutdown.Send); }).ContinueWith((t) => { try { t.Wait(); } catch { } });
+                        Task forwardClientWriteTask = clientChannel.CopyToAsync(tunnelChannel).ContinueWith((t) =>
+                        {
+                            tunnelChannel.StopSendingAsync();
+                        }).ContinueWith((t) =>
+                        {
+                            try
+                            {
+                                t.Wait();
+                            }
+                            catch
+                            {
+                            }
+                        });
+                        Task forwardTunnelWriteTask = tunnelChannel.CopyToAsync(clientChannel).ContinueWith((t) =>
+                        {
+                            client.Client.Shutdown(SocketShutdown.Send);
+                        }).ContinueWith((t) =>
+                        {
+                            try
+                            {
+                                t.Wait();
+                            }
+                            catch
+                            {
+                            }
+                        });
                         Task.WaitAll(forwardClientWriteTask, forwardTunnelWriteTask);
                     }
                 }

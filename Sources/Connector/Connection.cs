@@ -1,4 +1,10 @@
-﻿namespace Connector
+﻿//-----------------------------------------------------------------------
+// <copyright file="Connection.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Connector
 {
     using System;
     using System.Collections.Generic;
@@ -199,7 +205,7 @@
                     return this.OnSendRequestMessage((SendRequestMessage)message);
                 }
                 else if (message is TransportWriteCompletionMessage)
-                {   
+                {
                     return this.OnTransportWriteCompletionMessage((TransportWriteCompletionMessage)message);
                 }
                 else
@@ -472,7 +478,7 @@
                 if (bytesRead == 0)
                 {
                     // The other side closed the connection
-                    // TODO: Handle the connection close situation 
+                    // TODO: Handle the connection close situation
                     return ActorContinuation.BlockOnReceive;
                 }
 
@@ -716,7 +722,7 @@
                         completionHandle.NotifyCompleted(copiedCount);
                     }
 
-                    // TODO: Here is when a channel is closed by the other side 
+                    // TODO: Here is when a channel is closed by the other side
                 }
             }
 

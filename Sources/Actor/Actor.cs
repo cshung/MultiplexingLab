@@ -1,4 +1,10 @@
-﻿namespace Actor
+﻿//-----------------------------------------------------------------------
+// <copyright file="Actor.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Actor
 {
     using System;
     using System.Collections.Generic;
@@ -22,7 +28,7 @@
             Idle,
             Scheduled,
             Running,
-            Completed
+            Completed,
         }
 
         protected ActorManager ActorManager

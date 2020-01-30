@@ -1,4 +1,10 @@
-﻿namespace Server
+﻿//-----------------------------------------------------------------------
+// <copyright file="Program.cs" company="PlaceholderCompany">
+//     Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+
+namespace Server
 {
     using System;
     using System.IO;
@@ -38,7 +44,7 @@
         {
             // Accept more connections
             this.listener.BeginAcceptTcpClient(OnAcceptCallback, this);
-            ThreadPool.QueueUserWorkItem(async (state) => { await WorkAsync(client); });
+            ThreadPool.QueueUserWorkItem(async (state) => { await this.WorkAsync(client); });
         }
 
         private async Task WorkAsync(TcpClient client)

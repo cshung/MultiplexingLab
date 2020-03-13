@@ -29,7 +29,7 @@ namespace Server
         {
             Program program = new Program();
             program.Run();
-            Console.ReadLine();
+            new ManualResetEvent(false).WaitOne();
         }
 
         private static void OnAcceptTunnelCallback(IAsyncResult ar)

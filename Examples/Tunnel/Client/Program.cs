@@ -31,7 +31,7 @@ namespace Client
         {
             Program program = new Program();
             program.Run();
-            Console.ReadLine();
+            new ManualResetEvent(false).WaitOne();
         }
 
         private static void OnConnectCompletedCallback(IAsyncResult ar)

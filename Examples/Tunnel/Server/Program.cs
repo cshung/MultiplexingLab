@@ -100,7 +100,36 @@ namespace Server
         {
             // Accept more client connections
             this.clientListener.BeginAcceptTcpClient(OnAcceptClientCallback, this);
-            ThreadPool.QueueUserWorkItem((state) => { this.WorkAsync(client); });
+            if (this.Authenticate())
+            {
+                ThreadPool.QueueUserWorkItem((state) => { this.WorkAsync(client); });
+            }
+            else
+            {
+                client.Close();
+            }
+        }
+
+        private bool Authenticate()
+        {
+            try
+            {
+                TcpClient authClient = new TcpClient("localhost", 30624);
+                NetworkStream authStream = authClient.GetStream();
+                StreamReader authReader = new StreamReader(authStream);
+                StreamWriter authWriter = new StreamWriter(authStream) { AutoFlush = true };
+                authWriter.WriteLine("Can I connect?");
+                authWriter.Flush();
+                string response = authReader.ReadLine();
+                authWriter.Close();
+                authReader.Close();
+                authClient.Close();
+                return response == "yes";
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void WorkAsync(TcpClient client)
